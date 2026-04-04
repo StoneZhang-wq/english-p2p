@@ -27,7 +27,7 @@
 
 ## 3. 目录结构（目标与现状）
 
-**当前仓库**：前端静态原型位于 `web/`（`index.html`、`booking.html`、`appointments.html`、`room.html` 等）。后端待建。
+**当前仓库**：前端静态页位于 `backend/public/`（`index.html`、`booking.html`、`appointments.html`、`room.html` 等），由 Express 同机托管。
 
 **目标布局**：
 
@@ -40,8 +40,8 @@ project-root/
 │   ├── services/         # 邮件、短信、Agora Token 等
 │   ├── utils/            # 验证码、配对算法等
 │   ├── cron/             # 定时任务（开场前 5 分钟配对）
+│   ├── public/           # 前端静态页（HTML/CSS/JS，express.static）
 │   └── app.js            # Express 入口
-├── web/                  # 前端（可与 backend 同域静态托管或后续迁 frontend/）
 ├── db/
 │   └── schema.sql        # 建表脚本（见第 4 节）
 ├── docs/
@@ -213,9 +213,9 @@ CREATE TABLE credit_logs (
 
 ## 7. 前端规范
 
-- `<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">`（与现有 `web/` 页一致）。
+- `<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">`（与现有 `backend/public/` 页一致）。
 - 主要可点区域 **≥ 44×44px**。
-- 视觉基线：主题蓝可用 `#4A90E2` 或现有 `web/` 中 `#1A5CFF` / `#7096FF`，**同一应用内统一**；卡片圆角约 **12px**。
+- 视觉基线：主题蓝可用 `#4A90E2` 或现有 `public/` 样式中 `#1A5CFF` / `#7096FF`，**同一应用内统一**；卡片圆角约 **12px**。
 - 加载：使用 spinner 或骨架屏；错误用 **toast**，避免原生 `alert` 作为主交互。
 
 ---

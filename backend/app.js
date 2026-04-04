@@ -22,21 +22,15 @@ app.use(
 );
 app.use(express.json({ limit: "32kb" }));
 
-// 同机托管 web（__dirname = backend/，上一级 = 仓库根）。放在 /api 之前：未命中文件时交给后续路由。
-const webStatic = path.join(__dirname, "..", "web");
-// 临时调试：部署后在 Railway / 本地日志中搜 [debug] static
-console.log("[debug] static __dirname:", __dirname);
-console.log("[debug] static cwd:", process.cwd());
-console.log("[debug] static path:", webStatic);
-console.log("[debug] static path exists?", fs.existsSync(webStatic));
-if (!fs.existsSync(webStatic)) {
+// 静态页放在 backend/public，与 app 同根；Railway Root Directory 设为 backend 即可整包进容器。
+const publicDir = path.join(__dirname, "public");
+if (!fs.existsSync(publicDir)) {
   console.warn(
-    `[warn] 静态目录不存在: ${webStatic}\n` +
-      "  若部署在 Railway：Root Directory 请用仓库根目录，Start 用 `cd backend && node app.js`，\n" +
-      "  或保证构建产物里包含与 backend 同级的 web/。"
+    `[warn] 静态目录不存在: ${publicDir}\n` +
+      "  请确认已提交 backend/public/（含 index.html），且工作目录为 backend/。"
   );
 }
-app.use(express.static(webStatic));
+app.use(express.static(publicDir));
 
 app.get("/api/health", (_req, res) => {
   res.json({ code: 0, message: "ok", data: { ts: Date.now() } });
@@ -52,7 +46,7 @@ server.on("listening", () => {
   console.log(
     `Listening on port ${PORT} (process.env.PORT=${process.env.PORT !== undefined ? process.env.PORT : "unset, using 3000"})`
   );
-  console.log(`Static files: ${webStatic}`);
+  console.log(`Static files: ${publicDir}`);
   console.log(`CORS: ${origins.join(", ")}`);
   if (!process.env.AGORA_APP_CERTIFICATE) {
     console.warn("[warn] 未设置 AGORA_APP_CERTIFICATE，/api/agora/rtc-token 将返回 503");
