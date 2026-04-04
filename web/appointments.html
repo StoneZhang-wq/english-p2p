@@ -1,0 +1,81 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+    <title>我的预约 — 英语口语练习</title>
+    <link rel="stylesheet" href="css/styles.css" />
+  </head>
+  <body data-page="appointments">
+    <div class="app-shell">
+      <h1 class="page-title-simple">我的预约</h1>
+
+      <article class="appt-card">
+        <div class="row-top">
+          <h2>职场面试</h2>
+          <span class="status-tag done">已完成</span>
+        </div>
+        <div class="appt-meta">
+          时间：2026-04-04 14:00<br />
+          人数：1/2
+        </div>
+      </article>
+
+      <article class="appt-card">
+        <div class="row-top">
+          <h2>雅思口语 Part 2</h2>
+          <span class="status-tag done">已完成</span>
+        </div>
+        <div class="appt-meta">
+          时间：2026-04-03 16:00<br />
+          人数：1/2
+        </div>
+      </article>
+
+      <article class="appt-card" data-appt-cancelable>
+        <div class="row-top">
+          <h2>雅思口语 Part 2</h2>
+          <span class="status-tag pending">待进行</span>
+        </div>
+        <div class="appt-meta">
+          时间：2026-04-05 14:00<br />
+          人数：1/2
+        </div>
+        <a class="btn-enter" href="room.html?channel=demo-pair-room&amp;uid=10001">进入房间</a>
+        <div class="cancel-flow">
+          <button type="button" class="cancel-trigger" data-cancel-trigger>
+            取消预约
+          </button>
+          <div class="cancel-panel" data-cancel-panel hidden>
+            <p class="cancel-ask">确定取消？</p>
+            <div class="cancel-btns">
+              <button type="button" class="btn-cancel-dismiss" data-cancel-dismiss>
+                暂不
+              </button>
+              <button type="button" class="btn-cancel-confirm" data-cancel-confirm>
+                确认取消
+              </button>
+            </div>
+          </div>
+        </div>
+      </article>
+    </div>
+
+    <nav class="bottom-nav" aria-label="主导航">
+      <a href="index.html">
+        <svg viewBox="0 0 24 24" aria-hidden="true">
+          <path d="M3 10.5L12 3l9 7.5V20a1 1 0 0 1-1 1h-5v-6H9v6H4a1 1 0 0 1-1-1v-9.5z" />
+        </svg>
+        首页
+      </a>
+      <a href="appointments.html" class="active" aria-current="page">
+        <svg viewBox="0 0 24 24" aria-hidden="true">
+          <rect x="3" y="5" width="18" height="16" rx="2" />
+          <path d="M3 9h18M8 3v4M16 3v4" />
+        </svg>
+        我的预约
+      </a>
+    </nav>
+    <script src="js/appointments.js"></script>
+  </body>
+</html>

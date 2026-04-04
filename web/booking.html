@@ -1,0 +1,129 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+    <title>预约场次 — 英语口语练习</title>
+    <link rel="stylesheet" href="css/styles.css" />
+  </head>
+  <body data-page="booking">
+    <div class="app-shell">
+      <div class="top-bar">
+        <a class="back-link" href="index.html">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <path d="M15 18l-6-6 6-6" />
+          </svg>
+          返回
+        </a>
+      </div>
+
+      <div class="theme-hero">
+        <img class="cover" id="themeCover" src="" alt="" />
+      </div>
+      <div class="theme-hero-text">
+        <h1 id="themeTitle">职场面试</h1>
+        <p id="themeDesc">模拟英文面试，讨论职业规划</p>
+      </div>
+
+      <h2 class="section-title">1. 选择预约时间</h2>
+      <div class="slot-grid">
+        <button type="button" class="slot-card selected" data-time="14:00">
+          <div class="time">14:00</div>
+          <div class="meta">0 人已约</div>
+        </button>
+        <button type="button" class="slot-card" data-time="15:00">
+          <div class="time">15:00</div>
+          <div class="meta">0 人已约</div>
+        </button>
+        <button type="button" class="slot-card" data-time="16:00">
+          <div class="time">16:00</div>
+          <div class="meta">0 人已约</div>
+        </button>
+        <button type="button" class="slot-card" data-time="17:00">
+          <div class="time">17:00</div>
+          <div class="meta">0 人已约</div>
+        </button>
+        <button type="button" class="slot-card" data-time="18:00">
+          <div class="time">18:00</div>
+          <div class="meta">0 人已约</div>
+        </button>
+      </div>
+
+      <h2 class="section-title">2. 选择你的口语水平</h2>
+      <div class="level-row">
+        <button type="button" class="level-card" data-level="beginner">
+          <div class="lv">初级</div>
+          <div class="hint">基础表达</div>
+        </button>
+        <button type="button" class="level-card" data-level="mid">
+          <div class="lv">中级</div>
+          <div class="hint">日常交流</div>
+        </button>
+        <button type="button" class="level-card" data-level="adv">
+          <div class="lv">高级</div>
+          <div class="hint">流利、复杂场景</div>
+        </button>
+      </div>
+
+      <div class="tip-box">
+        <span class="icon" aria-hidden="true">💡</span>
+        <span
+          >我们会尽量为你匹配水平相近的伙伴（差距不超过一级），开场前 5
+          分钟通知你搭档是谁。</span
+        >
+      </div>
+
+      <button type="button" class="btn-primary">确认预约</button>
+    </div>
+
+    <nav class="bottom-nav" aria-label="主导航">
+      <a href="index.html" class="active" aria-current="page">
+        <svg viewBox="0 0 24 24" aria-hidden="true">
+          <path d="M3 10.5L12 3l9 7.5V20a1 1 0 0 1-1 1h-5v-6H9v6H4a1 1 0 0 1-1-1v-9.5z" />
+        </svg>
+        首页
+      </a>
+      <a href="appointments.html">
+        <svg viewBox="0 0 24 24" aria-hidden="true">
+          <rect x="3" y="5" width="18" height="16" rx="2" />
+          <path d="M3 9h18M8 3v4M16 3v4" />
+        </svg>
+        我的预约
+      </a>
+    </nav>
+
+    <script>
+      (function () {
+        var themes = {
+          interview: {
+            title: "职场面试",
+            desc: "模拟英文面试，讨论职业规划",
+            cover:
+              "https://images.unsplash.com/photo-1486406146926-c627a92ad1ab?w=800&q=80",
+          },
+          ielts: {
+            title: "雅思口语 Part 2",
+            desc: "随机抽取题库进行 2 分钟独白练习",
+            cover:
+              "https://images.unsplash.com/photo-1448375240586-882707db888b?w=800&q=80",
+          },
+          chat: {
+            title: "日常闲聊",
+            desc: "轻松的话题，分享生活趣事",
+            cover:
+              "https://images.unsplash.com/photo-1507525428034-b723cf961d3e?w=800&q=80",
+          },
+        };
+        var params = new URLSearchParams(window.location.search);
+        var key = params.get("theme") || "interview";
+        var t = themes[key] || themes.interview;
+        document.getElementById("themeTitle").textContent = t.title;
+        document.getElementById("themeDesc").textContent = t.desc;
+        var img = document.getElementById("themeCover");
+        img.src = t.cover;
+        img.alt = t.title;
+      })();
+    </script>
+    <script src="js/booking.js"></script>
+  </body>
+</html>

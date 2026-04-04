@@ -1,0 +1,957 @@
+/* 英语口语配对练习 — 移动端 UI（与设计稿对齐） */
+
+:root {
+  /* 浅色页（首页 / 预约 / 我的预约） */
+  --bg-page: #f8f9fa;
+  --bg-card: #ffffff;
+  --text-primary: #111827;
+  --text-secondary: #6b7280;
+  --text-muted: #9ca3af;
+  --border-light: #e5e7eb;
+  --blue-primary: #1a5cff;
+  --blue-soft: #7096ff;
+  --blue-soft-bg: #eef2ff;
+  --blue-soft-border: #4f46e5;
+  --blue-tip-bg: #eff6ff;
+  --blue-tip-text: #1d4ed8;
+  --nav-active: #1a5cff;
+  --nav-inactive: #9ca3af;
+  --tag-done-bg: #e6f4ea;
+  --tag-done-text: #1e8e3e;
+  --tag-pending-bg: #e8f0fe;
+  --tag-pending-text: #1967d2;
+  --danger: #d93025;
+  --radius-card: 12px;
+  --radius-btn: 12px;
+  --shadow-card: 0 4px 14px rgba(17, 24, 39, 0.06);
+  --safe-bottom: env(safe-area-inset-bottom, 0px);
+  --tab-h: 56px;
+
+  /* 房间页深色（任务确认稿：背景 #1A2233） */
+  --room-bg: #1a2233;
+  --room-surface: #222a3d;
+  --room-border: rgba(255, 255, 255, 0.1);
+  --room-blue: #2563eb;
+  --room-red: #ef4444;
+  --task-energy: #f97316;
+}
+
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+}
+
+html {
+  font-size: 16px;
+  -webkit-tap-highlight-color: transparent;
+}
+
+body {
+  margin: 0;
+  font-family: -apple-system, BlinkMacSystemFont, "PingFang SC", "Hiragino Sans GB",
+    "Microsoft YaHei", sans-serif;
+  background: var(--bg-page);
+  color: var(--text-primary);
+  line-height: 1.45;
+  min-height: 100dvh;
+  padding-bottom: calc(var(--tab-h) + var(--safe-bottom) + 12px);
+}
+
+body.page-room {
+  background: var(--room-bg);
+  color: #f3f4f6;
+  padding-bottom: calc(88px + var(--safe-bottom));
+}
+
+a {
+  color: inherit;
+  text-decoration: none;
+}
+
+img {
+  max-width: 100%;
+  display: block;
+}
+
+/* —— 布局 —— */
+.app-shell {
+  max-width: 480px;
+  margin: 0 auto;
+  padding: 16px 16px 0;
+}
+
+.page-room .app-shell {
+  padding-bottom: 8px;
+}
+
+.room-ios-banner {
+  margin: 0 0 12px;
+  padding: 10px 12px;
+  border-radius: 10px;
+  background: #fef2f2;
+  border: 1px solid #fecaca;
+  color: #b91c1c;
+  font-size: 0.8125rem;
+  line-height: 1.45;
+}
+
+.room-toast {
+  position: fixed;
+  left: 50%;
+  transform: translateX(-50%);
+  bottom: calc(88px + var(--safe-bottom));
+  max-width: 90%;
+  padding: 10px 14px;
+  border-radius: 10px;
+  background: rgba(31, 41, 55, 0.95);
+  color: #f3f4f6;
+  font-size: 0.8125rem;
+  z-index: 200;
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.25);
+}
+
+.room-toast--error {
+  background: rgba(127, 29, 29, 0.95);
+}
+
+.room-toast[hidden] {
+  display: none !important;
+}
+
+/* 对方确认条（非模态，贴底栏上方） */
+.partner-confirm-bar {
+  position: fixed;
+  left: 50%;
+  transform: translateX(-50%);
+  bottom: calc(88px + var(--safe-bottom));
+  width: calc(100% - 24px);
+  max-width: 456px;
+  padding: 12px 14px;
+  background: rgba(30, 41, 59, 0.98);
+  border: 1px solid var(--room-border);
+  border-radius: 12px;
+  z-index: 150;
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.45);
+}
+
+.partner-confirm-bar[hidden] {
+  display: none !important;
+}
+
+.partner-confirm-text {
+  margin: 0 0 12px;
+  font-size: 0.875rem;
+  color: #e2e8f0;
+  line-height: 1.45;
+}
+
+.partner-confirm-actions {
+  display: flex;
+  gap: 10px;
+  justify-content: flex-end;
+}
+
+.partner-confirm-btn {
+  min-height: 44px;
+  padding: 0 18px;
+  border: none;
+  border-radius: 10px;
+  font-size: 0.875rem;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.partner-confirm-btn--ok {
+  background: var(--room-blue);
+  color: #fff;
+}
+
+.partner-confirm-btn--deny {
+  background: #334155;
+  color: #e2e8f0;
+}
+
+/* —— 首页头部 —— */
+.home-header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 20px;
+}
+
+.home-header h1 {
+  margin: 0;
+  font-size: 1.5rem;
+  font-weight: 700;
+  letter-spacing: -0.02em;
+}
+
+.home-header .sub {
+  margin: 6px 0 0;
+  font-size: 0.8125rem;
+  color: var(--text-secondary);
+}
+
+.credit-pill {
+  text-align: right;
+  flex-shrink: 0;
+}
+
+.credit-pill .label {
+  font-size: 0.6875rem;
+  color: var(--text-muted);
+}
+
+.credit-pill .value {
+  font-size: 1.75rem;
+  font-weight: 700;
+  color: var(--blue-primary);
+  line-height: 1.1;
+}
+
+/* —— 主题卡片 —— */
+.topic-card {
+  display: block;
+  color: inherit;
+  text-decoration: none;
+  background: var(--bg-card);
+  border-radius: var(--radius-card);
+  box-shadow: var(--shadow-card);
+  overflow: hidden;
+  margin-bottom: 16px;
+}
+
+.topic-card .cover {
+  aspect-ratio: 16 / 9;
+  background: linear-gradient(135deg, #64748b 0%, #334155 100%);
+  object-fit: cover;
+  width: 100%;
+}
+
+.topic-card .body {
+  padding: 14px 16px 16px;
+}
+
+.topic-card h2 {
+  margin: 0 0 6px;
+  font-size: 1.0625rem;
+  font-weight: 700;
+}
+
+.topic-card p {
+  margin: 0;
+  font-size: 0.8125rem;
+  color: var(--text-secondary);
+}
+
+/* —— 预约页顶栏 —— */
+.top-bar {
+  margin: 0 0 12px;
+}
+
+.back-link {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  color: var(--blue-soft);
+  font-size: 0.9375rem;
+  font-weight: 500;
+}
+
+.back-link svg {
+  width: 18px;
+  height: 18px;
+}
+
+.theme-hero {
+  border-radius: var(--radius-card);
+  overflow: hidden;
+  margin-bottom: 12px;
+  box-shadow: var(--shadow-card);
+}
+
+.theme-hero .cover {
+  aspect-ratio: 16 / 9;
+  width: 100%;
+  object-fit: cover;
+  background: linear-gradient(135deg, #1e3a5f 0%, #0f172a 100%);
+}
+
+.theme-hero-text h1 {
+  margin: 12px 0 6px;
+  font-size: 1.375rem;
+  font-weight: 700;
+}
+
+.theme-hero-text p {
+  margin: 0 0 8px;
+  font-size: 0.875rem;
+  color: var(--text-secondary);
+}
+
+.section-title {
+  margin: 22px 0 12px;
+  font-size: 1rem;
+  font-weight: 700;
+}
+
+/* —— 时间段网格 —— */
+.slot-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 10px;
+}
+
+.slot-card {
+  background: var(--bg-card);
+  border: 1px solid var(--border-light);
+  border-radius: 10px;
+  padding: 14px 12px;
+  text-align: center;
+  cursor: pointer;
+  transition: border-color 0.15s, background 0.15s;
+}
+
+.slot-card .time {
+  font-size: 1.0625rem;
+  font-weight: 600;
+}
+
+.slot-card .meta {
+  margin-top: 4px;
+  font-size: 0.75rem;
+  color: var(--text-secondary);
+}
+
+.slot-card.selected {
+  background: var(--blue-soft-bg);
+  border-color: var(--blue-soft-border);
+  color: var(--blue-soft-border);
+}
+
+.slot-card.selected .meta {
+  color: var(--blue-soft-border);
+  opacity: 0.85;
+}
+
+/* —— 水平三选一 —— */
+.level-row {
+  display: grid;
+  grid-template-columns: 1fr 1fr 1fr;
+  gap: 8px;
+}
+
+.level-card {
+  background: var(--bg-card);
+  border: 1px solid var(--border-light);
+  border-radius: 10px;
+  padding: 12px 8px;
+  text-align: center;
+  cursor: pointer;
+  transition: border-color 0.15s, background 0.15s;
+}
+
+.level-card .lv {
+  font-size: 0.875rem;
+  font-weight: 700;
+}
+
+.level-card .hint {
+  margin-top: 4px;
+  font-size: 0.625rem;
+  color: var(--text-secondary);
+  line-height: 1.3;
+}
+
+.level-card.selected {
+  background: var(--blue-soft-bg);
+  border-color: var(--blue-soft-border);
+}
+
+.level-card.selected .lv {
+  color: var(--blue-soft-border);
+}
+
+.level-card.selected .hint {
+  color: #6366f1;
+}
+
+/* —— 提示条 —— */
+.tip-box {
+  display: flex;
+  gap: 10px;
+  align-items: flex-start;
+  margin-top: 18px;
+  padding: 12px 14px;
+  background: var(--blue-tip-bg);
+  border-radius: 10px;
+  font-size: 0.8125rem;
+  color: var(--blue-tip-text);
+  line-height: 1.5;
+}
+
+.tip-box .icon {
+  flex-shrink: 0;
+  font-size: 1rem;
+}
+
+/* —— 主按钮 —— */
+.btn-primary {
+  display: block;
+  width: 100%;
+  margin-top: 24px;
+  padding: 14px 20px;
+  border: none;
+  border-radius: var(--radius-btn);
+  background: var(--blue-soft);
+  color: #fff;
+  font-size: 1rem;
+  font-weight: 600;
+  cursor: pointer;
+  box-shadow: 0 4px 12px rgba(112, 150, 255, 0.35);
+}
+
+.btn-primary:active {
+  transform: scale(0.99);
+}
+
+.btn-primary:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+  box-shadow: none;
+}
+
+/* —— 我的预约卡片 —— */
+.appt-card {
+  position: relative;
+  background: var(--bg-card);
+  border: 1px solid var(--border-light);
+  border-radius: var(--radius-card);
+  padding: 16px;
+  margin-bottom: 14px;
+}
+
+.appt-card .row-top {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 8px;
+  margin-bottom: 10px;
+}
+
+.appt-card h2 {
+  margin: 0;
+  font-size: 1.0625rem;
+  font-weight: 700;
+}
+
+.status-tag {
+  flex-shrink: 0;
+  padding: 4px 10px;
+  border-radius: 999px;
+  font-size: 0.6875rem;
+  font-weight: 600;
+}
+
+.status-tag.done {
+  background: var(--tag-done-bg);
+  color: var(--tag-done-text);
+}
+
+.status-tag.pending {
+  background: var(--tag-pending-bg);
+  color: var(--tag-pending-text);
+}
+
+.status-tag.paired {
+  background: #ede9fe;
+  color: #5b21b6;
+}
+
+.appt-meta {
+  font-size: 0.8125rem;
+  color: var(--text-secondary);
+  line-height: 1.6;
+}
+
+.btn-enter {
+  display: block;
+  width: 100%;
+  margin-top: 14px;
+  padding: 12px;
+  border: none;
+  border-radius: 10px;
+  background: var(--blue-primary);
+  color: #fff;
+  font-size: 0.9375rem;
+  font-weight: 600;
+  text-align: center;
+  cursor: pointer;
+}
+
+.cancel-link {
+  display: block;
+  margin-top: 10px;
+  text-align: right;
+  font-size: 0.8125rem;
+  color: var(--danger);
+  background: none;
+  border: none;
+  padding: 0;
+  cursor: pointer;
+  width: 100%;
+}
+
+/* 取消预约：内联二次确认 */
+.cancel-flow {
+  margin-top: 12px;
+}
+
+.cancel-trigger {
+  display: block;
+  width: 100%;
+  margin-top: 10px;
+  text-align: right;
+  font-size: 0.8125rem;
+  color: var(--danger);
+  background: none;
+  border: none;
+  padding: 0;
+  cursor: pointer;
+}
+
+.cancel-panel[hidden] {
+  display: none !important;
+}
+
+.cancel-panel {
+  margin-top: 4px;
+}
+
+.cancel-ask {
+  margin: 0 0 10px;
+  font-size: 0.8125rem;
+  color: var(--text-secondary);
+}
+
+.cancel-btns {
+  display: flex;
+  gap: 10px;
+}
+
+.btn-cancel-dismiss {
+  flex: 1;
+  padding: 10px 14px;
+  border: 1px solid var(--border-light);
+  border-radius: 10px;
+  background: #f3f4f6;
+  color: var(--text-primary);
+  font-size: 0.875rem;
+  font-weight: 500;
+  cursor: pointer;
+}
+
+.btn-cancel-confirm {
+  flex: 1;
+  padding: 10px 14px;
+  border: none;
+  border-radius: 10px;
+  background: var(--danger);
+  color: #fff;
+  font-size: 0.875rem;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+/* —— 底部导航 —— */
+.bottom-nav {
+  position: fixed;
+  left: 50%;
+  transform: translateX(-50%);
+  bottom: 0;
+  width: 100%;
+  max-width: 480px;
+  height: calc(var(--tab-h) + var(--safe-bottom));
+  padding-bottom: var(--safe-bottom);
+  background: #fff;
+  border-top: 1px solid var(--border-light);
+  display: flex;
+  justify-content: space-around;
+  align-items: center;
+  z-index: 100;
+}
+
+.bottom-nav a {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 4px;
+  padding: 8px;
+  font-size: 0.6875rem;
+  color: var(--nav-inactive);
+}
+
+.bottom-nav a.active {
+  color: var(--nav-active);
+}
+
+.bottom-nav svg {
+  width: 22px;
+  height: 22px;
+  stroke: currentColor;
+  fill: none;
+  stroke-width: 1.8;
+}
+
+/* —— 房间页 —— */
+.room-top {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 16px;
+  padding-top: 4px;
+}
+
+.room-top .topic {
+  font-size: 1rem;
+  font-weight: 600;
+  max-width: 65%;
+}
+
+.room-timer {
+  padding: 6px 12px;
+  border-radius: 999px;
+  background: rgba(59, 130, 246, 0.25);
+  color: #93c5fd;
+  font-size: 0.875rem;
+  font-variant-numeric: tabular-nums;
+  font-weight: 600;
+}
+
+.video-row {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 10px;
+  margin-bottom: 18px;
+}
+
+.video-tile {
+  aspect-ratio: 3 / 4;
+  background: var(--room-surface);
+  border-radius: 12px;
+  border: 1px solid var(--room-border);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 12px;
+  text-align: center;
+  position: relative;
+  overflow: hidden;
+}
+
+.video-tile .avatar-placeholder {
+  width: 48px;
+  height: 48px;
+  border-radius: 50%;
+  background: #374151;
+  margin-bottom: 8px;
+}
+
+.video-tile .label {
+  font-size: 0.8125rem;
+  color: #9ca3af;
+}
+
+.video-tile .badge-me {
+  position: absolute;
+  left: 8px;
+  bottom: 8px;
+  font-size: 0.6875rem;
+  padding: 2px 8px;
+  border-radius: 6px;
+  background: rgba(0, 0, 0, 0.45);
+  color: #e5e7eb;
+}
+
+.room-section-head {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 10px;
+}
+
+.room-section-head h3 {
+  margin: 0;
+  font-size: 0.9375rem;
+  font-weight: 600;
+}
+
+.btn-swap {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 6px 10px;
+  border-radius: 8px;
+  border: 1px solid var(--room-border);
+  background: transparent;
+  color: #d1d5db;
+  font-size: 0.75rem;
+  cursor: pointer;
+}
+
+.role-row {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 10px;
+  margin-bottom: 20px;
+}
+
+.role-card {
+  background: var(--room-surface);
+  border: 1px solid var(--room-border);
+  border-radius: 12px;
+  padding: 14px 12px;
+  text-align: center;
+  font-size: 0.875rem;
+}
+
+.role-card.active {
+  border-color: var(--room-blue);
+  box-shadow: 0 0 0 1px var(--room-blue);
+}
+
+.prompts-head {
+  font-size: 0.75rem;
+  color: #6b7280;
+  letter-spacing: 0.04em;
+  margin-bottom: 8px;
+}
+
+.prompt-item {
+  background: var(--room-surface);
+  border: 1px solid var(--room-border);
+  border-radius: 10px;
+  padding: 12px 14px;
+  margin-bottom: 8px;
+  font-size: 0.875rem;
+  color: #e5e7eb;
+  line-height: 1.5;
+}
+
+.room-controls {
+  position: fixed;
+  left: 50%;
+  transform: translateX(-50%);
+  bottom: 0;
+  width: 100%;
+  max-width: 480px;
+  padding: 16px 24px calc(16px + var(--safe-bottom));
+  background: linear-gradient(transparent, rgba(18, 24, 38, 0.95));
+  display: flex;
+  justify-content: center;
+  gap: 28px;
+  z-index: 100;
+}
+
+.ctrl-btn {
+  width: 52px;
+  height: 52px;
+  border-radius: 50%;
+  border: none;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  background: #374151;
+  color: #fff;
+}
+
+.ctrl-btn.end {
+  background: var(--room-red);
+}
+
+.ctrl-btn.end svg {
+  transform: rotate(135deg);
+}
+
+.ctrl-btn svg {
+  width: 24px;
+  height: 24px;
+}
+
+/* —— 任务确认 UI（设计稿：顶栏任务卡 + 中部通话区 + 底栏控制） —— */
+.task-room-role {
+  margin: 0 0 12px;
+  font-size: 0.8125rem;
+  font-weight: 600;
+  color: #94a3b8;
+  letter-spacing: 0.02em;
+}
+
+.task-confirm-list {
+  list-style: none;
+  margin: 0 0 16px;
+  padding: 0;
+}
+
+.task-confirm-card {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 14px 16px;
+  margin-bottom: 10px;
+  background: var(--room-surface);
+  border: 1px solid var(--room-border);
+  border-radius: var(--radius-card);
+}
+
+.task-confirm-card:last-child {
+  margin-bottom: 0;
+}
+
+.task-confirm-card.is-done {
+  opacity: 0.65;
+  border-color: rgba(34, 197, 94, 0.35);
+}
+
+.task-confirm-main {
+  flex: 1;
+  min-width: 0;
+}
+
+.task-confirm-title {
+  margin: 0 0 6px;
+  font-size: 0.9375rem;
+  font-weight: 600;
+  color: #f8fafc;
+  line-height: 1.35;
+}
+
+.task-confirm-reward {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 0.8125rem;
+  font-weight: 700;
+  color: var(--task-energy);
+}
+
+.task-confirm-reward .ico {
+  font-size: 1rem;
+  line-height: 1;
+}
+
+.task-complete-btn {
+  flex-shrink: 0;
+  min-height: 44px;
+  padding: 0 18px;
+  border: none;
+  border-radius: 10px;
+  background: var(--room-blue);
+  color: #fff;
+  font-size: 0.875rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: opacity 0.15s, transform 0.1s;
+}
+
+.task-complete-btn:active:not(:disabled) {
+  transform: scale(0.98);
+}
+
+.task-complete-btn:disabled {
+  cursor: not-allowed;
+  opacity: 0.55;
+}
+
+.task-complete-btn.is-waiting {
+  background: #475569;
+  font-size: 0.75rem;
+  padding: 0 12px;
+  max-width: 42%;
+}
+
+.task-complete-btn.is-done {
+  background: rgba(34, 197, 94, 0.25);
+  color: #86efac;
+  border: 1px solid rgba(34, 197, 94, 0.4);
+}
+
+.task-call-stage {
+  min-height: 160px;
+  margin-bottom: 12px;
+  padding: 16px;
+  border-radius: 12px;
+  border: 1px dashed var(--room-border);
+  background: rgba(0, 0, 0, 0.2);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 12px;
+}
+
+.task-call-hint {
+  margin: 0;
+  font-size: 0.8125rem;
+  color: #64748b;
+}
+
+.video-row--compact {
+  width: 100%;
+  max-width: 320px;
+  margin: 0;
+}
+
+.video-row--compact .video-tile {
+  aspect-ratio: 4 / 3;
+  min-height: 88px;
+}
+
+.room-extra {
+  margin-top: 8px;
+  border-radius: 10px;
+  border: 1px solid var(--room-border);
+  background: rgba(0, 0, 0, 0.15);
+  overflow: hidden;
+}
+
+.room-extra summary {
+  padding: 10px 14px;
+  font-size: 0.8125rem;
+  color: #94a3b8;
+  cursor: pointer;
+  list-style: none;
+}
+
+.room-extra summary::-webkit-details-marker {
+  display: none;
+}
+
+.room-extra[open] summary {
+  border-bottom: 1px solid var(--room-border);
+}
+
+.room-extra-inner {
+  padding: 12px 14px 14px;
+}
+
+.page-title-simple {
+  margin: 0 0 18px;
+  font-size: 1.375rem;
+  font-weight: 700;
+  color: #1e3a5f;
+}
+
+@media (min-width: 480px) {
+  .app-shell {
+    padding-left: 20px;
+    padding-right: 20px;
+  }
+}

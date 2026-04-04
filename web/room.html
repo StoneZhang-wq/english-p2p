@@ -1,0 +1,152 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+    <title>练习房间 — 英语口语练习</title>
+    <link rel="stylesheet" href="css/styles.css" />
+    <script
+      src="https://cdn.jsdelivr.net/npm/agora-rtc-sdk-ng@4.23.2/AgoraRTC_N-production.js"
+      crossorigin="anonymous"
+    ></script>
+  </head>
+  <body
+    class="page-room"
+    data-page="room"
+    data-api-base="http://localhost:3000"
+  >
+    <div class="app-shell">
+      <p class="room-ios-banner" role="status">
+        若使用 iPhone：请在 <strong>Safari</strong> 或 <strong>Chrome</strong> 中打开本页，以获得麦克风权限；微信内置浏览器可能无法采集语音。
+      </p>
+
+      <header class="room-top">
+        <div class="topic">银行取钱 · 角色扮演</div>
+        <div class="room-timer" id="roomTimer">00:00</div>
+      </header>
+
+      <p class="task-room-role">你的任务（收银员）</p>
+      <ul class="task-confirm-list" id="taskConfirmList" aria-label="子任务列表">
+        <li class="task-confirm-card" data-task-id="a1">
+          <div class="task-confirm-main">
+            <h4 class="task-confirm-title">主动询问取钱用途</h4>
+            <div class="task-confirm-reward">
+              <span>+10</span><span class="ico" aria-hidden="true">⚡</span>
+            </div>
+          </div>
+          <button type="button" class="task-complete-btn">完成</button>
+        </li>
+        <li class="task-confirm-card" data-task-id="a2">
+          <div class="task-confirm-main">
+            <h4 class="task-confirm-title">提出替代方案（如理财）</h4>
+            <div class="task-confirm-reward">
+              <span>+10</span><span class="ico" aria-hidden="true">⚡</span>
+            </div>
+          </div>
+          <button type="button" class="task-complete-btn">完成</button>
+        </li>
+        <li class="task-confirm-card" data-task-id="a3">
+          <div class="task-confirm-main">
+            <h4 class="task-confirm-title">让客户犹豫一次</h4>
+            <div class="task-confirm-reward">
+              <span>+10</span><span class="ico" aria-hidden="true">⚡</span>
+            </div>
+          </div>
+          <button type="button" class="task-complete-btn">完成</button>
+        </li>
+      </ul>
+
+      <div class="task-call-stage">
+        <p class="task-call-hint">实时语音通话中 · 点击「完成」后等待对方确认</p>
+        <div class="video-row video-row--compact">
+          <div class="video-tile">
+            <div class="avatar-placeholder" aria-hidden="true"></div>
+            <div class="label">搭档（连接中…）</div>
+          </div>
+          <div class="video-tile">
+            <span class="badge-me">我</span>
+          </div>
+        </div>
+      </div>
+
+      <details class="room-extra">
+        <summary>角色与讨论提示（展开）</summary>
+        <div class="room-extra-inner">
+          <div class="room-section-head">
+            <h3>角色扮演</h3>
+            <button type="button" class="btn-swap" id="btnSwap" title="互换显示（演示）">
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <path d="M17 1l4 4-4 4" />
+                <path d="M3 11V9a4 4 0 0 1 4-4h14M7 23l-4-4 4-4" />
+                <path d="M21 13v2a4 4 0 0 1-4 4H3" />
+              </svg>
+              互换
+            </button>
+          </div>
+          <div class="role-row">
+            <div class="role-card active" id="roleMe">收银员</div>
+            <div class="role-card" id="rolePartner">客户</div>
+          </div>
+          <div class="prompts-head">讨论提示 · PROMPTS</div>
+          <div class="prompt-item">State clearly how much you want to withdraw.</div>
+          <div class="prompt-item">The teller may suggest alternatives — respond in English.</div>
+          <div class="prompt-item">Stay in role until subtasks are done or time is up.</div>
+        </div>
+      </details>
+    </div>
+
+    <div id="roomToast" class="room-toast" hidden role="status" aria-live="polite"></div>
+
+    <!-- 对方确认条（非模态，与设计文档一致；演示用定时模拟确认） -->
+    <div id="partnerConfirmBar" class="partner-confirm-bar" hidden role="dialog" aria-label="待你确认">
+      <p class="partner-confirm-text" id="partnerConfirmText"></p>
+      <div class="partner-confirm-actions">
+        <button type="button" class="partner-confirm-btn partner-confirm-btn--deny" id="partnerDeny">否认</button>
+        <button type="button" class="partner-confirm-btn partner-confirm-btn--ok" id="partnerOk">确认</button>
+      </div>
+    </div>
+
+    <div class="room-controls" role="toolbar" aria-label="通话控制">
+      <button type="button" class="ctrl-btn" aria-label="麦克风" id="btnMic">
+        <svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
+          <path
+            d="M12 14a3 3 0 0 0 3-3V5a3 3 0 0 0-6 0v6a3 3 0 0 0 3 3zm5-3a5 5 0 0 1-10 0H5a7 7 0 0 0 6 6.92V21h2v-3.08A7 7 0 0 0 19 11h-2z"
+          />
+        </svg>
+      </button>
+      <button type="button" class="ctrl-btn" aria-label="摄像头" id="btnCam">
+        <svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
+          <path
+            d="M4 7a2 2 0 0 0-2 2v6a2 2 0 0 0 2 2h9a2 2 0 0 0 2-2v-2l4 2V9l-4 2V9a2 2 0 0 0-2-2H4z"
+          />
+        </svg>
+      </button>
+      <button type="button" class="ctrl-btn end" aria-label="结束通话" id="btnEnd">
+        <svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
+          <path
+            d="M6.62 10.79c1.44 2.83 3.76 5.14 6.59 6.59l2.2-2.2c.27-.27.67-.36 1.02-.24 1.12.37 2.33.57 3.57.57.55 0 1 .45 1 1V20c0 .55-.45 1-1 1-9.39 0-17-7.61-17-17 0-.55.45-1 1-1h3.5c.55 0 1 .45 1 1 0 1.25.2 2.45.57 3.57.11.35.03.74-.25 1.02l-2.2 2.2z"
+          />
+        </svg>
+      </button>
+    </div>
+
+    <script src="js/room.js"></script>
+    <script src="js/room-tasks.js"></script>
+    <script>
+      (function () {
+        var swap = document.getElementById("btnSwap");
+        var a = document.getElementById("roleMe");
+        var b = document.getElementById("rolePartner");
+        if (!swap || !a || !b) return;
+        swap.addEventListener("click", function () {
+          var t = a.textContent;
+          a.textContent = b.textContent;
+          b.textContent = t;
+          a.classList.toggle("active");
+          b.classList.toggle("active");
+        });
+      })();
+    </script>
+    <script src="js/room-agora.js"></script>
+  </body>
+</html>
