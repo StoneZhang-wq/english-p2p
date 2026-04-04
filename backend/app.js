@@ -22,14 +22,13 @@ app.use(
 );
 app.use(express.json({ limit: "32kb" }));
 
-app.get("/api/health", (_req, res) => {
-  res.json({ code: 0, message: "ok", data: { ts: Date.now() } });
-});
-
-app.use("/api/agora", agoraRouter);
-
-// 同机托管 web 静态资源（__dirname 为 backend/，上一级为仓库根）
+// 同机托管 web（__dirname = backend/，上一级 = 仓库根）。放在 /api 之前：未命中文件时交给后续路由。
 const webStatic = path.join(__dirname, "..", "web");
+// 临时调试：部署后在 Railway / 本地日志中搜 [debug] static
+console.log("[debug] static __dirname:", __dirname);
+console.log("[debug] static cwd:", process.cwd());
+console.log("[debug] static path:", webStatic);
+console.log("[debug] static path exists?", fs.existsSync(webStatic));
 if (!fs.existsSync(webStatic)) {
   console.warn(
     `[warn] 静态目录不存在: ${webStatic}\n` +
@@ -38,6 +37,12 @@ if (!fs.existsSync(webStatic)) {
   );
 }
 app.use(express.static(webStatic));
+
+app.get("/api/health", (_req, res) => {
+  res.json({ code: 0, message: "ok", data: { ts: Date.now() } });
+});
+
+app.use("/api/agora", agoraRouter);
 
 // 勿把 listen 的回调当作「唯一回调」：端口被占用时 Express 仍会调用该函数，
 // 容易误报「已启动」随后进程因无监听而立刻退出（nodemon 显示 clean exit）。
