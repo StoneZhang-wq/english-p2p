@@ -43,6 +43,17 @@
     return msg;
   }
 
+  /** unilbs 返回 no active status：多为控制台项目/计费/证书与 App 不匹配，非本页 CSS 或区域重试可根治 */
+  function joinFailureHint(e) {
+    var text = formatAgoraError(e);
+    var blob = text + (e && e.data ? JSON.stringify(e.data) : "");
+    if (/no active status|CAN_NOT_GET_GATEWAY/i.test(blob)) {
+      text +=
+        " — 声网调度已连通，但判定当前 App 不可用。请到声网控制台检查：① 该项目已启用且开通「视频通话/RTC」；② 账户无欠费、试用未过期；③ Railway 里 AGORA_APP_ID 与 AGORA_APP_CERTIFICATE 为同一项目且证书未重置；④ 国际区与国内区控制台勿混用。仍失败请带 App ID 与上述日志联系声网支持。";
+    }
+    return text;
+  }
+
   async function fetchRtcToken(channelName, uid) {
     var res = await fetch(apiBase() + "/api/agora/rtc-token", {
       method: "POST",
@@ -168,7 +179,7 @@
       })();
     } catch (e) {
       console.error(e);
-      showRoomToast("加入频道失败：" + formatAgoraError(e), true);
+      showRoomToast("加入频道失败：" + joinFailureHint(e), true);
       setPartnerLabel("搭档（未连接）");
       return;
     }
