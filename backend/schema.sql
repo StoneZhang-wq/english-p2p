@@ -1,6 +1,5 @@
--- 英语口语真人匹配平台 — SQLite 初始化脚本
--- 与 ARCHITECTURE.md 保持一致；迁移时请版本化
--- 部署（Railway Root=backend）使用 backend/schema.sql，请与此文件保持同步
+-- 与仓库根目录 db/schema.sql 保持一致（Railway Root=backend 时仅本文件会进镜像）
+-- 修改表结构时请同步更新 db/schema.sql
 
 PRAGMA foreign_keys = ON;
 

@@ -22,7 +22,7 @@ npm run dev
 | POST | `/api/auth/logout` | 清除 Cookie |
 | GET | `/api/auth/me` | 返回 `{ user }` 或 `user: null` |
 
-数据：**SQLite**（默认 `db/app.db`，与 `db/schema.sql` 对齐）。驱动为 Node **内置 `node:sqlite`**（建议 **Node ≥ 22.5**；启动时可能出现 experimental 提示，属正常）。后续业务路由可用 `middleware/requireAuth.js` 的 `requireAuth` 保护。
+数据：**SQLite**（默认 **`backend/data/app.db`**；建表脚本优先读 **`backend/schema.sql`**，本地 monorepo 亦可使用 `db/schema.sql`）。驱动为 Node **内置 `node:sqlite`**（建议 **Node ≥ 22.5**）。表结构变更时请同步 **`db/schema.sql` 与 `backend/schema.sql`**。后续业务路由可用 `middleware/requireAuth.js` 的 `requireAuth` 保护。
 
 **已有旧库**：若 `users` 表无 `password_hash` 列，启动时会自动 `ALTER TABLE` 补列；旧行需重新注册或自行补密码哈希。
 
@@ -63,4 +63,4 @@ git push -u origin main
 - **构建 / 启动**（Root = `backend` 时）：**Install** `npm install`，**Start** `npm start`（或 `node app.js`）。
 - **若 Root 留空（仓库根）**：**Install** `cd backend && npm install`，**Start** `cd backend && node app.js`。
 - **Variables**：`JWT_SECRET`（≥16 字符，生产必填）、`NODE_ENV=production`、`AGORA_APP_ID`、`AGORA_APP_CERTIFICATE`、`CORS_ORIGINS`（含你的 `https://…up.railway.app`）。
-- **数据库**：默认 SQLite 在 **`../db/app.db`**（相对 `backend/`）。Railway 文件系统**非持久**时，每次部署会重置库；若要保留用户，请挂 **Volume** 并把 `DB_PATH` 指到挂载路径，或改用 PostgreSQL。
+- **数据库**：镜像内含 **`backend/schema.sql`**（Root=`backend` 时也会执行建表）。默认库文件 **`backend/data/app.db`**。文件系统**非持久**时重部署会清空数据；要保留请挂 **Volume** 并设置 **`DB_PATH`**（如 `/data/app.db`），或改用 PostgreSQL。

@@ -42,18 +42,35 @@ function seedDemoIfEmpty(db) {
     (${c}, datetime('now', '+4 day'), datetime('now', '+4 day', '+1 hour'), 5, 0, 'open');`);
 }
 
+function resolveSchemaPath() {
+  const candidates = [
+    path.join(__dirname, "schema.sql"),
+    path.join(__dirname, "..", "db", "schema.sql"),
+  ];
+  for (const p of candidates) {
+    if (fs.existsSync(p)) return p;
+  }
+  return null;
+}
+
 function openDatabase() {
-  const dbPath = process.env.DB_PATH || path.join(__dirname, "..", "db", "app.db");
+  // 默认库在 backend/data/，Railway 仅部署 backend 时无需上级 db/ 目录
+  const dbPath = process.env.DB_PATH || path.join(__dirname, "data", "app.db");
   const dir = path.dirname(dbPath);
   if (!fs.existsSync(dir)) {
     fs.mkdirSync(dir, { recursive: true });
   }
   const db = new DatabaseSync(dbPath);
   db.exec("PRAGMA foreign_keys = ON");
-  const schemaPath = path.join(__dirname, "..", "db", "schema.sql");
-  if (fs.existsSync(schemaPath)) {
-    db.exec(fs.readFileSync(schemaPath, "utf8"));
+
+  const schemaPath = resolveSchemaPath();
+  if (!schemaPath) {
+    throw new Error(
+      "未找到 schema.sql：请将建表脚本放在 backend/schema.sql（或与 monorepo 中 ../db/schema.sql 并存）"
+    );
   }
+  db.exec(fs.readFileSync(schemaPath, "utf8"));
+
   migrateUsersTable(db);
   seedDemoIfEmpty(db);
   return db;
