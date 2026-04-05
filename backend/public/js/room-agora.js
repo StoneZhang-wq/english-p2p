@@ -5,6 +5,7 @@
 (function () {
   var state = {
     client: null,
+    joined: false,
     localAudio: null,
     localVideo: null,
     micOn: true,
@@ -83,7 +84,6 @@
     }
 
     var client = AgoraRTC.createClient({ mode: "rtc", codec: "vp8" });
-    state.client = client;
 
     try {
       await client.join(cred.appId, cred.channelName, cred.token, cred.uid);
@@ -93,6 +93,9 @@
       setPartnerLabel("搭档（未连接）");
       return;
     }
+
+    state.client = client;
+    state.joined = true;
 
     try {
       state.localAudio = await AgoraRTC.createMicrophoneAudioTrack();
@@ -156,6 +159,7 @@
       if (selfTile) selfTile.classList.remove("video-tile--local-live");
       var partnerTile = document.getElementById("tilePartner");
       if (partnerTile) partnerTile.classList.remove("video-tile--remote-live");
+      state.joined = false;
       if (state.client) {
         await state.client.leave();
         state.client = null;
@@ -180,8 +184,8 @@
     var btnCam = document.getElementById("btnCam");
     if (btnCam) {
       btnCam.addEventListener("click", async function () {
-        if (!state.client) {
-          showRoomToast("尚未加入频道", true);
+        if (!state.joined || !state.client) {
+          showRoomToast("正在加入频道，请稍候再开摄像头", true);
           return;
         }
         try {
@@ -210,6 +214,13 @@
           }
         } catch (e) {
           console.error(e);
+          if (state.localVideo && !state.camOn) {
+            try {
+              state.localVideo.stop();
+              state.localVideo.close();
+            } catch (_) {}
+            state.localVideo = null;
+          }
           showRoomToast("摄像头：" + (e.message || e), true);
         }
       });
