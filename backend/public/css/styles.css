@@ -644,14 +644,45 @@ img {
   background: var(--room-surface);
   border-radius: 12px;
   border: 1px solid var(--room-border);
+  display: block;
+  padding: 0;
+  position: relative;
+  overflow: hidden;
+}
+
+/* Agora 播放在此层铺满，避免与占位 flex 子项抢高度导致只显示一条细带 */
+.video-tile__media {
+  position: absolute;
+  inset: 0;
+  z-index: 1;
+  border-radius: inherit;
+  overflow: hidden;
+}
+
+.video-tile__media video {
+  width: 100% !important;
+  height: 100% !important;
+  object-fit: cover !important;
+  display: block;
+}
+
+.video-tile__standby {
+  position: absolute;
+  inset: 0;
+  z-index: 2;
   display: flex;
   flex-direction: column;
   align-items: center;
   justify-content: center;
   padding: 12px;
   text-align: center;
-  position: relative;
-  overflow: hidden;
+  background: var(--room-surface);
+  transition: opacity 0.2s ease;
+}
+
+.video-tile--remote-live .video-tile__standby {
+  opacity: 0;
+  pointer-events: none;
 }
 
 .video-tile .avatar-placeholder {
@@ -671,6 +702,7 @@ img {
   position: absolute;
   left: 8px;
   bottom: 8px;
+  z-index: 3;
   font-size: 0.6875rem;
   padding: 2px 8px;
   border-radius: 6px;

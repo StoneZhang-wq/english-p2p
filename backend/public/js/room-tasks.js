@@ -1,6 +1,5 @@
 /**
- * 任务确认：点击「完成」→ 等待对方确认（演示：定时模拟对方请求 + 本端确认条）
- * 接入 WebSocket 后替换为真实对端事件
+ * 任务确认：点击「完成」→ 经 WebSocket 通知同频道对端弹出确认条 → 结果回传完成方
  */
 (function () {
   var list = document.getElementById("taskConfirmList");
@@ -63,16 +62,6 @@
     });
   }
 
-  /** 演示：你点「完成」后，短暂延迟弹出「对方请你确认」条，模拟双向 */
-  function simulatePartnerConfirmRequest(title, cb) {
-    showToast("已通知对方，等待确认…", false);
-    setTimeout(function () {
-      showPartnerBar(title, function (result) {
-        cb(result);
-      });
-    }, 800);
-  }
-
   function markCardDone(card, btn) {
     card.classList.add("is-done");
     btn.disabled = true;
@@ -96,7 +85,143 @@
     showToast("确认超时，未计入能量（可稍后补确认）", false);
   }
 
+  function markCardDisconnect(card, btn) {
+    btn.disabled = false;
+    btn.textContent = "完成";
+    btn.classList.remove("is-waiting");
+    showToast("连接已断开，请刷新后重试", true);
+  }
+
+  function newRequestId() {
+    if (typeof crypto !== "undefined" && typeof crypto.randomUUID === "function") {
+      return crypto.randomUUID();
+    }
+    return "r" + Date.now() + "-" + Math.random().toString(36).slice(2, 11);
+  }
+
+  function queryRoomIdentity() {
+    var params = new URLSearchParams(window.location.search);
+    return {
+      channel: params.get("channel") || "demo_eng_local",
+      uid: Number(params.get("uid") || "10001"),
+    };
+  }
+
+  function buildWsUrl() {
+    var q = queryRoomIdentity();
+    var proto = window.location.protocol === "https:" ? "wss:" : "ws:";
+    return (
+      proto +
+      "//" +
+      window.location.host +
+      "/ws/room?channel=" +
+      encodeURIComponent(q.channel) +
+      "&uid=" +
+      encodeURIComponent(String(q.uid))
+    );
+  }
+
+  var ws = null;
+  var wsReady = false;
+  var reconnectTimer = null;
+  /** @type {Record<string, { timeoutId: number, card: HTMLElement, btn: HTMLButtonElement }>} */
+  var waiterByRequestId = Object.create(null);
+
+  function clearWaiter(requestId, run) {
+    var w = waiterByRequestId[requestId];
+    if (!w) return;
+    delete waiterByRequestId[requestId];
+    clearTimeout(w.timeoutId);
+    if (run) run(w.card, w.btn);
+  }
+
+  function failAllWaiters() {
+    Object.keys(waiterByRequestId).forEach(function (rid) {
+      clearWaiter(rid, function (card, btn) {
+        markCardDisconnect(card, btn);
+      });
+    });
+  }
+
+  function applyResultToCard(card, btn, result) {
+    if (result === "ok") {
+      markCardDone(card, btn);
+    } else if (result === "deny") {
+      markCardRejected(card, btn);
+    } else if (result === "disconnect") {
+      markCardDisconnect(card, btn);
+    } else {
+      markCardTimeout(card, btn);
+    }
+  }
+
+  function connectWs() {
+    if (reconnectTimer) {
+      clearTimeout(reconnectTimer);
+      reconnectTimer = null;
+    }
+    try {
+      ws = new WebSocket(buildWsUrl());
+    } catch (e) {
+      console.error(e);
+      reconnectTimer = setTimeout(connectWs, 3000);
+      return;
+    }
+
+    ws.onopen = function () {
+      wsReady = true;
+    };
+
+    ws.onclose = function () {
+      wsReady = false;
+      ws = null;
+      failAllWaiters();
+      reconnectTimer = setTimeout(connectWs, 3000);
+    };
+
+    ws.onerror = function () {};
+
+    ws.onmessage = function (ev) {
+      var msg;
+      try {
+        msg = JSON.parse(ev.data);
+      } catch {
+        return;
+      }
+      if (!msg || typeof msg.type !== "string") return;
+
+      if (msg.type === "task_confirm_prompt") {
+        var title = String(msg.title || "");
+        var requestId = msg.requestId;
+        var fromUid = msg.fromUid;
+        var taskId = msg.taskId;
+        showPartnerBar(title, function (result) {
+          if (!ws || ws.readyState !== WebSocket.OPEN) return;
+          ws.send(
+            JSON.stringify({
+              type: "task_confirm_response",
+              requestId: requestId,
+              taskId: taskId,
+              result: result,
+              targetUid: fromUid,
+            })
+          );
+        });
+        return;
+      }
+
+      if (msg.type === "task_confirm_result") {
+        var rid = msg.requestId;
+        clearWaiter(rid, function (card, btn) {
+          applyResultToCard(card, btn, msg.result);
+        });
+      }
+    };
+  }
+
   if (!list) return;
+
+  connectWs();
 
   list.querySelectorAll(".task-confirm-card").forEach(function (card) {
     var btn = card.querySelector(".task-complete-btn");
@@ -105,21 +230,47 @@
 
     btn.addEventListener("click", function () {
       if (btn.disabled || btn.classList.contains("is-done")) return;
+      if (!wsReady || !ws || ws.readyState !== WebSocket.OPEN) {
+        showToast("信令未连接，请稍候或刷新页面", true);
+        return;
+      }
+
       btn.classList.add("is-waiting");
       btn.textContent = "等待确认…";
       btn.disabled = true;
 
       var title = titleEl.textContent.trim();
+      var requestId = newRequestId();
+      var taskId = card.getAttribute("data-task-id") || "";
 
-      simulatePartnerConfirmRequest(title, function (result) {
-        if (result === "ok") {
-          markCardDone(card, btn);
-        } else if (result === "deny") {
-          markCardRejected(card, btn);
-        } else {
-          markCardTimeout(card, btn);
-        }
-      });
+      waiterByRequestId[requestId] = {
+        timeoutId: setTimeout(function () {
+          clearWaiter(requestId, function (c, b) {
+            markCardTimeout(c, b);
+          });
+        }, 120000),
+        card: card,
+        btn: btn,
+      };
+
+      try {
+        ws.send(
+          JSON.stringify({
+            type: "task_complete_request",
+            requestId: requestId,
+            taskId: taskId,
+            title: title,
+          })
+        );
+        showToast("已通知对方，等待确认…", false);
+      } catch (e) {
+        clearWaiter(requestId, function (c, b) {
+          b.disabled = false;
+          b.textContent = "完成";
+          b.classList.remove("is-waiting");
+        });
+        showToast("发送失败，请重试", true);
+      }
     });
   });
 })();

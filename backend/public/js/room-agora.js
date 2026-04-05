@@ -30,8 +30,8 @@
   }
 
   function setPartnerLabel(text) {
-    var tile = document.querySelector(".video-row .video-tile .label");
-    if (tile) tile.textContent = text;
+    var el = document.querySelector("#tilePartner .label");
+    if (el) el.textContent = text;
   }
 
   async function fetchRtcToken(channelName, uid) {
@@ -109,8 +109,10 @@
           user.audioTrack.play();
         }
         if (mediaType === "video" && user.videoTrack) {
-          var box = document.querySelector(".video-row .video-tile:first-child");
-          if (box) user.videoTrack.play(box, { fit: "cover" });
+          var remoteSlot = document.getElementById("remoteVideoSlot");
+          var partnerTile = document.getElementById("tilePartner");
+          if (remoteSlot) user.videoTrack.play(remoteSlot, { fit: "cover" });
+          if (partnerTile) partnerTile.classList.add("video-tile--remote-live");
         }
         setPartnerLabel("搭档（已连接）");
       } catch (e) {
@@ -118,11 +120,20 @@
       }
     });
 
-    client.on("user-unpublished", function () {
-      setPartnerLabel("搭档（已静音或离开）");
+    client.on("user-unpublished", function (user, mediaType) {
+      if (mediaType === "video") {
+        var partnerTile = document.getElementById("tilePartner");
+        if (partnerTile) partnerTile.classList.remove("video-tile--remote-live");
+        setPartnerLabel("搭档（已连接）");
+      }
+      if (mediaType === "audio") {
+        setPartnerLabel("搭档（无麦克风）");
+      }
     });
 
     client.on("user-left", function () {
+      var partnerTile = document.getElementById("tilePartner");
+      if (partnerTile) partnerTile.classList.remove("video-tile--remote-live");
       setPartnerLabel("搭档（已离开）");
     });
 
@@ -141,6 +152,10 @@
         state.localVideo.close();
         state.localVideo = null;
       }
+      var selfTile = document.getElementById("tileSelf");
+      if (selfTile) selfTile.classList.remove("video-tile--local-live");
+      var partnerTile = document.getElementById("tilePartner");
+      if (partnerTile) partnerTile.classList.remove("video-tile--remote-live");
       if (state.client) {
         await state.client.leave();
         state.client = null;
@@ -173,8 +188,10 @@
           if (!state.camOn) {
             state.localVideo = await AgoraRTC.createCameraVideoTrack();
             await state.client.publish([state.localVideo]);
-            var meTile = document.querySelector(".video-row .video-tile:last-child");
-            if (meTile) state.localVideo.play(meTile, { fit: "cover", mirror: true });
+            var localSlot = document.getElementById("localVideoSlot");
+            var selfTile = document.getElementById("tileSelf");
+            if (localSlot) state.localVideo.play(localSlot, { fit: "cover", mirror: true });
+            if (selfTile) selfTile.classList.add("video-tile--local-live");
             state.camOn = true;
             btnCam.style.opacity = "1";
             showRoomToast("已开启摄像头", false);
@@ -185,6 +202,8 @@
               state.localVideo.close();
               state.localVideo = null;
             }
+            var selfTile = document.getElementById("tileSelf");
+            if (selfTile) selfTile.classList.remove("video-tile--local-live");
             state.camOn = false;
             btnCam.style.opacity = "0.6";
             showRoomToast("已关闭摄像头", false);

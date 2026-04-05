@@ -55,11 +55,15 @@
       <div class="task-call-stage">
         <p class="task-call-hint">实时语音通话中 · 点击「完成」后等待对方确认</p>
         <div class="video-row video-row--compact">
-          <div class="video-tile">
-            <div class="avatar-placeholder" aria-hidden="true"></div>
-            <div class="label">搭档（连接中…）</div>
+          <div class="video-tile video-tile--partner" id="tilePartner">
+            <div class="video-tile__media" id="remoteVideoSlot" aria-hidden="true"></div>
+            <div class="video-tile__standby">
+              <div class="avatar-placeholder" aria-hidden="true"></div>
+              <div class="label">搭档（连接中…）</div>
+            </div>
           </div>
-          <div class="video-tile">
+          <div class="video-tile video-tile--self" id="tileSelf">
+            <div class="video-tile__media" id="localVideoSlot" aria-hidden="true"></div>
             <span class="badge-me">我</span>
           </div>
         </div>

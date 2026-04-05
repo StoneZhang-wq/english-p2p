@@ -9,6 +9,7 @@ const authRouter = require("./routes/auth");
 const timeslotsRouter = require("./routes/timeslots");
 const bookingsRouter = require("./routes/bookings");
 const agoraRouter = require("./routes/agora");
+const { attachRoomTaskWebSocket } = require("./services/roomTaskWs");
 
 const app = express();
 app.set("trust proxy", 1);
@@ -63,6 +64,7 @@ if (process.env.NODE_ENV === "production") {
 initDb()
   .then(() => {
     const server = app.listen(PORT);
+    attachRoomTaskWebSocket(server);
 
     server.on("listening", () => {
       console.log(
