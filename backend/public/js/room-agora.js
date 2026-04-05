@@ -71,6 +71,19 @@
     var channelName = params.get("channel") || "demo_eng_local";
     var uid = Number(params.get("uid") || "10001");
 
+    /* 入会前设置接入区域，缓解 CAN_NOT_GET_GATEWAY_SERVER / no active status（国内与国际控制台线路不一致时） */
+    var areaToken = params.get("agoraArea");
+    if (areaToken && typeof AgoraRTC.setArea === "function" && AgoraRTC.AREAS) {
+      var areaKey = String(areaToken).toUpperCase().replace(/[^A-Z_]/g, "");
+      if (AgoraRTC.AREAS[areaKey] !== undefined) {
+        try {
+          AgoraRTC.setArea([AgoraRTC.AREAS[areaKey]]);
+        } catch (e) {
+          console.warn("AgoraRTC.setArea", e);
+        }
+      }
+    }
+
     setPartnerLabel("搭档（连接中…）");
 
     var cred;
@@ -84,26 +97,6 @@
     }
 
     var client = AgoraRTC.createClient({ mode: "rtc", codec: "vp8" });
-
-    try {
-      await client.join(cred.appId, cred.channelName, cred.token, cred.uid);
-    } catch (e) {
-      console.error(e);
-      showRoomToast("加入频道失败：" + (e.message || e), true);
-      setPartnerLabel("搭档（未连接）");
-      return;
-    }
-
-    state.client = client;
-    state.joined = true;
-
-    try {
-      state.localAudio = await AgoraRTC.createMicrophoneAudioTrack();
-      await client.publish([state.localAudio]);
-    } catch (e) {
-      console.error(e);
-      showRoomToast("麦克风不可用：" + (e.message || e), true);
-    }
 
     client.on("user-published", async function (user, mediaType) {
       try {
@@ -139,6 +132,26 @@
       if (partnerTile) partnerTile.classList.remove("video-tile--remote-live");
       setPartnerLabel("搭档（已离开）");
     });
+
+    try {
+      await client.join(cred.appId, cred.channelName, cred.token, cred.uid);
+    } catch (e) {
+      console.error(e);
+      showRoomToast("加入频道失败：" + (e.message || e), true);
+      setPartnerLabel("搭档（未连接）");
+      return;
+    }
+
+    state.client = client;
+    state.joined = true;
+
+    try {
+      state.localAudio = await AgoraRTC.createMicrophoneAudioTrack();
+      await client.publish([state.localAudio]);
+    } catch (e) {
+      console.error(e);
+      showRoomToast("麦克风不可用：" + (e.message || e), true);
+    }
 
     showRoomToast("已加入频道，等待语伴…", false);
   }

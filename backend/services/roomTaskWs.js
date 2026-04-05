@@ -32,7 +32,11 @@ function attachRoomTaskWebSocket(server) {
       return;
     }
 
-    if (url.pathname !== "/ws/room") return;
+    /* 非本 WebSocket 路径必须关闭 socket，否则半开连接会堆积并拖垮同进程的 HTTP/API（含 rtc-token） */
+    if (url.pathname !== "/ws/room") {
+      socket.destroy();
+      return;
+    }
 
     const channel = url.searchParams.get("channel") || "";
     const uid = Number(url.searchParams.get("uid"));
@@ -42,9 +46,14 @@ function attachRoomTaskWebSocket(server) {
       return;
     }
 
-    wss.handleUpgrade(request, socket, head, (ws) => {
-      wss.emit("connection", ws, { channel, uid });
-    });
+    try {
+      wss.handleUpgrade(request, socket, head, (ws) => {
+        wss.emit("connection", ws, { channel, uid });
+      });
+    } catch (e) {
+      console.warn("[ws/room] handleUpgrade", e && e.message);
+      socket.destroy();
+    }
   });
 
   wss.on("connection", (ws, { channel, uid }) => {
