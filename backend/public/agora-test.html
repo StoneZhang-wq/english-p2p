@@ -1,0 +1,62 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+    <title>声网联调（免预约）— 英语口语练习</title>
+    <link rel="stylesheet" href="css/styles.css" />
+  </head>
+  <body data-page="agora-test">
+    <div class="app-shell">
+      <h1 class="page-title-simple">声网联调（免预约）</h1>
+      <p class="booking-empty" style="margin-bottom: 16px">
+        当前后端 <strong>不会</strong>校验预约或配对；房间页通过 URL 指定频道与 UID 即可向
+        <code>/api/agora/rtc-token</code> 取 Token 入会。正式产品上线前建议在服务端为 Token 增加「登录 + 属于该场次
+        pair」校验。
+      </p>
+
+      <div class="tip-box" style="margin-bottom: 20px">
+        <span class="icon" aria-hidden="true">📱</span>
+        <span
+          ><strong>两台设备</strong>（或两个浏览器窗口）进入<strong>同一 channel</strong>、<strong>不同
+            uid</strong>，才能互相听到声音。请允许麦克风权限；HTTPS 站点才符合浏览器媒体权限要求。</span
+        >
+      </div>
+
+      <p style="font-size: 0.9375rem; font-weight: 600; margin: 0 0 10px; color: var(--text-primary)">
+        测试用频道名（可改 URL 中的 <code>channel</code>）：
+        <code id="channelLabel">cloud-dev</code>
+      </p>
+
+      <ul style="margin: 0 0 20px; padding-left: 1.2rem; color: var(--text-secondary); font-size: 0.9375rem">
+        <li style="margin-bottom: 10px">
+          <strong>用户 A</strong>（uid 10001）：
+          <a id="linkA" href="#" style="color: var(--blue-primary); font-weight: 600">打开房间</a>
+        </li>
+        <li>
+          <strong>用户 B</strong>（uid 10002）：
+          <a id="linkB" href="#" style="color: var(--blue-primary); font-weight: 600">打开房间</a>
+        </li>
+      </ul>
+
+      <p class="booking-empty">
+        若入会失败：检查服务器已配置 <code>AGORA_APP_ID</code> / <code>AGORA_APP_CERTIFICATE</code>，以及
+        <code>CORS_ORIGINS</code> 是否包含当前访问域名。
+      </p>
+
+      <p class="auth-footer" style="margin-top: 24px">
+        <a href="index.html">返回首页</a>
+        ·
+        <a href="room.html">默认房间（无参数）</a>
+      </p>
+    </div>
+    <script>
+      (function () {
+        var ch = "cloud-dev";
+        var base = "room.html?channel=" + encodeURIComponent(ch) + "&uid=";
+        document.getElementById("linkA").href = base + "10001";
+        document.getElementById("linkB").href = base + "10002";
+      })();
+    </script>
+  </body>
+</html>

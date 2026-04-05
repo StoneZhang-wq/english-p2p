@@ -41,6 +41,12 @@ npm run dev
 
 **尚未实现**（按 `ARCHITECTURE.md` 后续迭代）：开场前 cron 配对算法、`pairs` 写入、邮件通知、**`POST /api/agora/rtc-token` 与登录态及 pair 绑定校验**（当前仍为演示级 Token）。配对可用一般图最大匹配（等级差≤1）在 `O(n³)` 内完成。
 
+### 声网联调（免预约）
+
+部署后可直接打开 **`/agora-test.html`**，按页内两个链接用 **不同 uid** 进同一频道；或手动访问  
+`room.html?channel=cloud-dev&uid=10001` 与 `room.html?channel=cloud-dev&uid=10002`。  
+**无需**先预约。上线前请为 `rtc-token` 增加鉴权与 pair 校验。
+
 ## 推送到 GitHub（首次）
 
 1. 在 [github.com/new](https://github.com/new) 新建仓库（不要勾选「Add README」）。
