@@ -35,6 +35,14 @@
     if (el) el.textContent = text;
   }
 
+  function formatAgoraError(e) {
+    var msg = (e && e.message) || (e ? String(e) : "未知错误");
+    if (e && e.code !== undefined && e.code !== "") {
+      msg += " (code:" + e.code + ")";
+    }
+    return msg;
+  }
+
   async function fetchRtcToken(channelName, uid) {
     var res = await fetch(apiBase() + "/api/agora/rtc-token", {
       method: "POST",
@@ -70,19 +78,7 @@
     var params = new URLSearchParams(window.location.search);
     var channelName = params.get("channel") || "demo_eng_local";
     var uid = Number(params.get("uid") || "10001");
-
-    /* 入会前设置接入区域，缓解 CAN_NOT_GET_GATEWAY_SERVER / no active status（国内与国际控制台线路不一致时） */
     var areaToken = params.get("agoraArea");
-    if (areaToken && typeof AgoraRTC.setArea === "function" && AgoraRTC.AREAS) {
-      var areaKey = String(areaToken).toUpperCase().replace(/[^A-Z_]/g, "");
-      if (AgoraRTC.AREAS[areaKey] !== undefined) {
-        try {
-          AgoraRTC.setArea([AgoraRTC.AREAS[areaKey]]);
-        } catch (e) {
-          console.warn("AgoraRTC.setArea", e);
-        }
-      }
-    }
 
     setPartnerLabel("搭档（连接中…）");
 
@@ -134,10 +130,45 @@
     });
 
     try {
-      await client.join(cred.appId, cred.channelName, cred.token, cred.uid);
+      await (async function tryJoinChannel() {
+        var A = AgoraRTC.AREAS;
+        var setArea = typeof AgoraRTC.setArea === "function" ? AgoraRTC.setArea.bind(AgoraRTC) : null;
+        var areaOrders = [];
+
+        if (areaToken && A && setArea) {
+          var areaKey = String(areaToken).toUpperCase().replace(/[^A-Z_]/g, "");
+          if (A[areaKey] !== undefined) {
+            areaOrders.push([A[areaKey]]);
+          }
+        }
+
+        /* 未指定 agoraArea 时：按两种顺序尝试 GLOBAL+CHINA，缓解 CAN_NOT_GET_GATEWAY_SERVER / no active status */
+        if (areaOrders.length === 0 && A && setArea && A.GLOBAL != null && A.CHINA != null) {
+          areaOrders.push([A.GLOBAL, A.CHINA]);
+          areaOrders.push([A.CHINA, A.GLOBAL]);
+        }
+
+        if (areaOrders.length === 0) {
+          await client.join(cred.appId, cred.channelName, cred.token, cred.uid);
+          return;
+        }
+
+        var lastErr;
+        for (var i = 0; i < areaOrders.length; i++) {
+          try {
+            setArea(areaOrders[i]);
+            await client.join(cred.appId, cred.channelName, cred.token, cred.uid);
+            return;
+          } catch (err) {
+            lastErr = err;
+            console.warn("Agora join attempt " + (i + 1) + "/" + areaOrders.length, err);
+          }
+        }
+        throw lastErr;
+      })();
     } catch (e) {
       console.error(e);
-      showRoomToast("加入频道失败：" + (e.message || e), true);
+      showRoomToast("加入频道失败：" + formatAgoraError(e), true);
       setPartnerLabel("搭档（未连接）");
       return;
     }
