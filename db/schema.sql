@@ -8,6 +8,7 @@ CREATE TABLE IF NOT EXISTS users (
   phone VARCHAR(20) UNIQUE,
   email VARCHAR(120) UNIQUE,
   nickname VARCHAR(50) NOT NULL,
+  password_hash TEXT,
   credit_score INTEGER NOT NULL DEFAULT 10,
   created_at DATETIME DEFAULT CURRENT_TIMESTAMP
 );

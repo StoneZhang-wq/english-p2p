@@ -949,6 +949,97 @@ img {
   color: #1e3a5f;
 }
 
+/* —— 登录态 / 注册登录表单 —— */
+.session-bar {
+  margin-top: 8px;
+  font-size: 0.8125rem;
+  color: var(--text-secondary);
+}
+
+.session-bar a {
+  color: var(--blue-primary);
+  font-weight: 500;
+}
+
+.session-bar button {
+  margin-left: 10px;
+  padding: 4px 10px;
+  font-size: 0.75rem;
+  border: 1px solid var(--border-light);
+  border-radius: 8px;
+  background: var(--bg-card);
+  color: var(--text-secondary);
+}
+
+.auth-page .page-title-simple {
+  margin-top: 8px;
+}
+
+.auth-form label {
+  display: block;
+  font-size: 0.8125rem;
+  color: var(--text-secondary);
+  margin-bottom: 4px;
+}
+
+.auth-form input {
+  width: 100%;
+  padding: 12px 14px;
+  border: 1px solid var(--border-light);
+  border-radius: var(--radius-btn);
+  margin-bottom: 14px;
+  font-size: 1rem;
+}
+
+.auth-form button[type="submit"] {
+  width: 100%;
+  padding: 14px;
+  margin-top: 4px;
+  background: var(--blue-primary);
+  color: #fff;
+  border: none;
+  border-radius: var(--radius-btn);
+  font-size: 1rem;
+  font-weight: 600;
+}
+
+.auth-footer {
+  margin-top: 20px;
+  font-size: 0.875rem;
+  color: var(--text-secondary);
+  text-align: center;
+}
+
+.auth-footer a {
+  color: var(--blue-primary);
+  font-weight: 500;
+}
+
+.auth-error {
+  color: var(--danger);
+  font-size: 0.875rem;
+  margin-bottom: 10px;
+  min-height: 1.25em;
+}
+
+.booking-poll-status,
+.appt-poll-status {
+  font-size: 0.8125rem;
+  color: var(--text-secondary);
+  margin: 0 0 12px;
+}
+
+.booking-poll-status--error,
+.appt-poll-status--error {
+  color: var(--danger);
+}
+
+.booking-empty {
+  margin: 16px 0;
+  font-size: 0.9375rem;
+  color: var(--text-secondary);
+}
+
 @media (min-width: 480px) {
   .app-shell {
     padding-left: 20px;

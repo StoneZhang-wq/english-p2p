@@ -6,7 +6,7 @@ const router = express.Router();
 /**
  * POST /api/agora/rtc-token
  * Body: { channelName: string, uid: number }
- * 生产环境必须：登录态 + 校验当前用户属于该 channel 对应 pair（此处为集成骨架）
+ * 生产必须：登录态 + 校验 channel 与当前用户在 pairs 中匹配（防枚举频道窃听）。当前仍为演示骨架。
  */
 router.post("/rtc-token", (req, res) => {
   try {

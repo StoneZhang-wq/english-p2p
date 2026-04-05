@@ -1,0 +1,58 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+    <title>注册 — 英语口语练习</title>
+    <link rel="stylesheet" href="css/styles.css" />
+  </head>
+  <body data-page="register">
+    <div class="app-shell auth-page">
+      <h1 class="page-title-simple">注册</h1>
+      <p class="auth-error" id="authError" role="alert"></p>
+      <form class="auth-form" id="registerForm" novalidate>
+        <label for="nickname">昵称</label>
+        <input id="nickname" name="nickname" type="text" autocomplete="nickname" maxlength="50" required />
+        <label for="email">邮箱</label>
+        <input id="email" name="email" type="email" autocomplete="email" required />
+        <label for="password">密码（至少 8 位）</label>
+        <input id="password" name="password" type="password" autocomplete="new-password" minlength="8" required />
+        <button type="submit">注册并登录</button>
+      </form>
+      <p class="auth-footer">已有账号？<a href="login.html">登录</a> · <a href="index.html">返回首页</a></p>
+    </div>
+    <script>
+      (function () {
+        var errEl = document.getElementById("authError");
+        document.getElementById("registerForm").addEventListener("submit", function (e) {
+          e.preventDefault();
+          errEl.textContent = "";
+          var nickname = document.getElementById("nickname").value.trim();
+          var email = document.getElementById("email").value.trim();
+          var password = document.getElementById("password").value;
+          fetch("/api/auth/register", {
+            method: "POST",
+            credentials: "include",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ nickname: nickname, email: email, password: password }),
+          })
+            .then(function (r) {
+              return r.json().then(function (j) {
+                return { ok: r.ok, j: j };
+              });
+            })
+            .then(function (x) {
+              if (x.j.code === 0) {
+                window.location.href = "index.html";
+                return;
+              }
+              errEl.textContent = x.j.message || "注册失败";
+            })
+            .catch(function () {
+              errEl.textContent = "网络错误，请重试";
+            });
+        });
+      })();
+    </script>
+  </body>
+</html>

@@ -25,29 +25,9 @@
         <p id="themeDesc">模拟英文面试，讨论职业规划</p>
       </div>
 
+      <p class="booking-poll-status" id="bookingPollStatus" hidden role="status"></p>
       <h2 class="section-title">1. 选择预约时间</h2>
-      <div class="slot-grid">
-        <button type="button" class="slot-card selected" data-time="14:00">
-          <div class="time">14:00</div>
-          <div class="meta">0 人已约</div>
-        </button>
-        <button type="button" class="slot-card" data-time="15:00">
-          <div class="time">15:00</div>
-          <div class="meta">0 人已约</div>
-        </button>
-        <button type="button" class="slot-card" data-time="16:00">
-          <div class="time">16:00</div>
-          <div class="meta">0 人已约</div>
-        </button>
-        <button type="button" class="slot-card" data-time="17:00">
-          <div class="time">17:00</div>
-          <div class="meta">0 人已约</div>
-        </button>
-        <button type="button" class="slot-card" data-time="18:00">
-          <div class="time">18:00</div>
-          <div class="meta">0 人已约</div>
-        </button>
-      </div>
+      <div class="slot-grid" id="slotGrid"></div>
 
       <h2 class="section-title">2. 选择你的口语水平</h2>
       <div class="level-row">
@@ -92,38 +72,7 @@
       </a>
     </nav>
 
-    <script>
-      (function () {
-        var themes = {
-          interview: {
-            title: "职场面试",
-            desc: "模拟英文面试，讨论职业规划",
-            cover:
-              "https://images.unsplash.com/photo-1486406146926-c627a92ad1ab?w=800&q=80",
-          },
-          ielts: {
-            title: "雅思口语 Part 2",
-            desc: "随机抽取题库进行 2 分钟独白练习",
-            cover:
-              "https://images.unsplash.com/photo-1448375240586-882707db888b?w=800&q=80",
-          },
-          chat: {
-            title: "日常闲聊",
-            desc: "轻松的话题，分享生活趣事",
-            cover:
-              "https://images.unsplash.com/photo-1507525428034-b723cf961d3e?w=800&q=80",
-          },
-        };
-        var params = new URLSearchParams(window.location.search);
-        var key = params.get("theme") || "interview";
-        var t = themes[key] || themes.interview;
-        document.getElementById("themeTitle").textContent = t.title;
-        document.getElementById("themeDesc").textContent = t.desc;
-        var img = document.getElementById("themeCover");
-        img.src = t.cover;
-        img.alt = t.title;
-      })();
-    </script>
-    <script src="js/booking.js"></script>
+    <script src="js/pollBackoff.js"></script>
+    <script src="js/booking-flow.js"></script>
   </body>
 </html>

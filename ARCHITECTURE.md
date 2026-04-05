@@ -63,12 +63,13 @@ project-root/
 执行 `db/schema.sql` 初始化。核心表如下（与实现保持一致时可扩展字段，但需同步改本文与迁移脚本）。
 
 ```sql
--- 用户表（MVP 可用邮箱登录时增加 email 字段，与产品描述一致）
+-- 用户表（邮箱 + bcrypt 密码哈希；认证 API 见 README）
 CREATE TABLE users (
   id INTEGER PRIMARY KEY AUTOINCREMENT,
   phone VARCHAR(20) UNIQUE,
   email VARCHAR(120) UNIQUE,
   nickname VARCHAR(50) NOT NULL,
+  password_hash TEXT,
   credit_score INTEGER NOT NULL DEFAULT 10,
   created_at DATETIME DEFAULT CURRENT_TIMESTAMP
 );

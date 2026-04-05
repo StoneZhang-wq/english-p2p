@@ -9,56 +9,8 @@
   <body data-page="appointments">
     <div class="app-shell">
       <h1 class="page-title-simple">我的预约</h1>
-
-      <article class="appt-card">
-        <div class="row-top">
-          <h2>职场面试</h2>
-          <span class="status-tag done">已完成</span>
-        </div>
-        <div class="appt-meta">
-          时间：2026-04-04 14:00<br />
-          人数：1/2
-        </div>
-      </article>
-
-      <article class="appt-card">
-        <div class="row-top">
-          <h2>雅思口语 Part 2</h2>
-          <span class="status-tag done">已完成</span>
-        </div>
-        <div class="appt-meta">
-          时间：2026-04-03 16:00<br />
-          人数：1/2
-        </div>
-      </article>
-
-      <article class="appt-card" data-appt-cancelable>
-        <div class="row-top">
-          <h2>雅思口语 Part 2</h2>
-          <span class="status-tag pending">待进行</span>
-        </div>
-        <div class="appt-meta">
-          时间：2026-04-05 14:00<br />
-          人数：1/2
-        </div>
-        <a class="btn-enter" href="room.html?channel=demo-pair-room&amp;uid=10001">进入房间</a>
-        <div class="cancel-flow">
-          <button type="button" class="cancel-trigger" data-cancel-trigger>
-            取消预约
-          </button>
-          <div class="cancel-panel" data-cancel-panel hidden>
-            <p class="cancel-ask">确定取消？</p>
-            <div class="cancel-btns">
-              <button type="button" class="btn-cancel-dismiss" data-cancel-dismiss>
-                暂不
-              </button>
-              <button type="button" class="btn-cancel-confirm" data-cancel-confirm>
-                确认取消
-              </button>
-            </div>
-          </div>
-        </div>
-      </article>
+      <p class="appt-poll-status" id="apptPollStatus" hidden role="status"></p>
+      <div id="liveBookings"></div>
     </div>
 
     <nav class="bottom-nav" aria-label="主导航">
@@ -76,6 +28,7 @@
         我的预约
       </a>
     </nav>
-    <script src="js/appointments.js"></script>
+    <script src="js/pollBackoff.js"></script>
+    <script src="js/appointments-live.js"></script>
   </body>
 </html>

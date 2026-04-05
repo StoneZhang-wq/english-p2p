@@ -6,12 +6,39 @@
 
 ```bash
 cd backend
-cp .env.example .env   # 填写声网 App ID / Certificate
+cp .env.example .env   # 填写 JWT_SECRET、声网 App ID / Certificate 等
 npm install
 npm run dev
 ```
 
-浏览器打开 `http://localhost:3000/index.html`（端口以 `.env` 为准）。
+浏览器打开 `http://localhost:3000/index.html`（端口以 `.env` 为准）。首页可 **注册 / 登录**；登录态使用 **httpOnly Cookie**（`credentials: 'include'`），`CORS_ORIGINS` 须包含当前访问来源。
+
+### 认证 API（MVP）
+
+| 方法 | 路径 | 说明 |
+|------|------|------|
+| POST | `/api/auth/register` | Body: `{ email, password, nickname }`，成功则 Set-Cookie |
+| POST | `/api/auth/login` | Body: `{ email, password }` |
+| POST | `/api/auth/logout` | 清除 Cookie |
+| GET | `/api/auth/me` | 返回 `{ user }` 或 `user: null` |
+
+数据：**SQLite**（默认 `db/app.db`，与 `db/schema.sql` 对齐）。驱动为 Node **内置 `node:sqlite`**（建议 **Node ≥ 22.5**；启动时可能出现 experimental 提示，属正常）。后续业务路由可用 `middleware/requireAuth.js` 的 `requireAuth` 保护。
+
+**已有旧库**：若 `users` 表无 `password_hash` 列，启动时会自动 `ALTER TABLE` 补列；旧行需重新注册或自行补密码哈希。
+
+### 预约与场次 API
+
+| 方法 | 路径 | 说明 |
+|------|------|------|
+| GET | `/api/timeslots?theme=interview` | `theme`：`interview` / `ielts` / `chat`（与首页链接一致）；或 `theme_id` 数字 |
+| POST | `/api/bookings` | 需登录；Body `{ timeslot_id, level }`，`level`：`beginner` / `mid` / `adv` 或 `intermediate` 等 |
+| GET | `/api/bookings/mine` | 需登录；返回预约列表及搭档、`channel_name`（配对后） |
+
+预约写入使用 **`BEGIN IMMEDIATE`** 事务，校验 `status = 'open'` 与 `booked_count < max_pairs * 2`，与文档中的防超卖一致。
+
+首次启动且**无任何场次**时，会自动插入演示主题与场次（仅当 `timeslots` 表为空）。
+
+**尚未实现**（按 `ARCHITECTURE.md` 后续迭代）：开场前 cron 配对算法、`pairs` 写入、邮件通知、**`POST /api/agora/rtc-token` 与登录态及 pair 绑定校验**（当前仍为演示级 Token）。配对可用一般图最大匹配（等级差≤1）在 `O(n³)` 内完成。
 
 ## 推送到 GitHub（首次）
 
@@ -35,4 +62,5 @@ git push -u origin main
 - **Root Directory**：设为 **`backend`**（与 `package.json` 同级）。静态文件在 **`backend/public/`**，与 `app.js` 同根，避免「只上传 backend 子目录丢前端」的问题。
 - **构建 / 启动**（Root = `backend` 时）：**Install** `npm install`，**Start** `npm start`（或 `node app.js`）。
 - **若 Root 留空（仓库根）**：**Install** `cd backend && npm install`，**Start** `cd backend && node app.js`。
-- **Variables**：`AGORA_APP_ID`、`AGORA_APP_CERTIFICATE`、`CORS_ORIGINS`（含你的 `https://…up.railway.app`）。
+- **Variables**：`JWT_SECRET`（≥16 字符，生产必填）、`NODE_ENV=production`、`AGORA_APP_ID`、`AGORA_APP_CERTIFICATE`、`CORS_ORIGINS`（含你的 `https://…up.railway.app`）。
+- **数据库**：默认 SQLite 在 **`../db/app.db`**（相对 `backend/`）。Railway 文件系统**非持久**时，每次部署会重置库；若要保留用户，请挂 **Volume** 并把 `DB_PATH` 指到挂载路径，或改用 PostgreSQL。

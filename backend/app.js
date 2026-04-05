@@ -1,11 +1,17 @@
 require("dotenv").config();
 const express = require("express");
 const cors = require("cors");
+const cookieParser = require("cookie-parser");
 const path = require("path");
 const fs = require("fs");
+const { getDb } = require("./db");
+const authRouter = require("./routes/auth");
+const timeslotsRouter = require("./routes/timeslots");
+const bookingsRouter = require("./routes/bookings");
 const agoraRouter = require("./routes/agora");
 
 const app = express();
+app.set("trust proxy", 1);
 // Railway / 云平台会注入 PORT；本地默认 3000。勿在代码里写死端口。
 const PORT = Number(process.env.PORT) || 3000;
 
@@ -20,6 +26,7 @@ app.use(
     credentials: true,
   })
 );
+app.use(cookieParser());
 app.use(express.json({ limit: "32kb" }));
 
 // 静态页放在 backend/public，与 app 同根；Railway Root Directory 设为 backend 即可整包进容器。
@@ -36,7 +43,25 @@ app.get("/api/health", (_req, res) => {
   res.json({ code: 0, message: "ok", data: { ts: Date.now() } });
 });
 
+app.use("/api/auth", authRouter);
+app.use("/api/timeslots", timeslotsRouter);
+app.use("/api/bookings", bookingsRouter);
 app.use("/api/agora", agoraRouter);
+
+try {
+  getDb();
+} catch (e) {
+  console.error("[错误] SQLite 初始化失败:", e.message);
+  process.exit(1);
+}
+if (process.env.NODE_ENV === "production") {
+  if (!process.env.JWT_SECRET || process.env.JWT_SECRET.length < 16) {
+    console.error("[错误] 生产环境必须设置 JWT_SECRET（至少 16 字符）");
+    process.exit(1);
+  }
+} else if (!process.env.JWT_SECRET || process.env.JWT_SECRET.length < 16) {
+  console.warn("[warn] 未设置 JWT_SECRET，开发环境使用内置弱密钥，请勿用于生产");
+}
 
 // 勿把 listen 的回调当作「唯一回调」：端口被占用时 Express 仍会调用该函数，
 // 容易误报「已启动」随后进程因无监听而立刻退出（nodemon 显示 clean exit）。
@@ -48,6 +73,7 @@ server.on("listening", () => {
   );
   console.log(`Static files: ${publicDir}`);
   console.log(`CORS: ${origins.join(", ")}`);
+  console.log("SQLite: connected");
   if (!process.env.AGORA_APP_CERTIFICATE) {
     console.warn("[warn] 未设置 AGORA_APP_CERTIFICATE，/api/agora/rtc-token 将返回 503");
   }
