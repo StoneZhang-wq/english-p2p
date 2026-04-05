@@ -18,7 +18,7 @@
 |------|------|
 | 前端 | HTML5 + CSS3 + **原生 JavaScript**（可选后续引入 Vue 3 CDN），响应式 flex/grid，**主视口宽度 &lt; 600px** 优先 |
 | 后端 | **Node.js + Express** |
-| 数据库 | **SQLite**（开发/测试）；生产可迁 **PostgreSQL** |
+| 数据库 | **PostgreSQL**（`pg` + `DATABASE_URL`）；`db/schema.postgres.sql` 建表 |
 | 实时语音 | **Agora RTC Web SDK v4.x** |
 | 通知 | **Nodemailer**（邮件）；后续可选阿里云/腾讯云短信 |
 | 部署 | 轻量云服务器 + **Nginx** 反向代理 + **PM2** 守护 |
@@ -36,20 +36,20 @@ project-root/
 ├── backend/
 │   ├── routes/           # API 路由
 │   ├── controllers/      # 业务逻辑
-│   ├── models/           # 数据访问（SQLite）
+│   ├── models/           # 数据访问（PostgreSQL / pg）
 │   ├── services/         # 邮件、短信、Agora Token 等
 │   ├── utils/            # 验证码、配对算法等
 │   ├── cron/             # 定时任务（开场前 5 分钟配对）
 │   ├── public/           # 前端静态页（HTML/CSS/JS，express.static）
 │   └── app.js            # Express 入口
 ├── db/
-│   └── schema.sql        # 建表脚本（见第 4 节）
+│   └── schema.postgres.sql # 建表脚本（见第 4 节）
 ├── docs/
 │   ├── 产品描述.md
 │   └── 产品与需求变更规则.md
 ├── .cursor/
 │   └── rules/
-├── db/*.db               # SQLite 数据文件（加入 .gitignore）
+├── db/schema.postgres.sql # PostgreSQL 建表（与 backend/schema.postgres.sql 同步）
 ├── .env                  # 环境变量（不提交）
 ├── .cursorrules          # Cursor 入口规则
 ├── ARCHITECTURE.md       # 本文件
@@ -60,7 +60,7 @@ project-root/
 
 ## 4. 数据库设计
 
-执行 `db/schema.sql` 初始化。核心表如下（与实现保持一致时可扩展字段，但需同步改本文与迁移脚本）。
+执行 `db/schema.postgres.sql`（或应用启动时自动执行）初始化。核心表如下（与实现保持一致时可扩展字段，但需同步改本文与迁移脚本）。
 
 ```sql
 -- 用户表（邮箱 + bcrypt 密码哈希；认证 API 见 README）
@@ -241,7 +241,7 @@ SMS_ACCESS_SECRET=
 ## 9. 脚本约定（待 package.json）
 
 - `npm run dev`：`nodemon` 启动 `backend/app.js`
-- `npm run migrate`：执行 `db/schema.sql` 初始化
+- 应用启动：执行 `schema.postgres.sql`（`CREATE IF NOT EXISTS`）
 - 生产：`pm2 start backend/app.js --name english-match`
 
 ---

@@ -1,14 +1,16 @@
 /**
- * 预约写入：BEGIN IMMEDIATE 占写锁，与 ARCHITECTURE / 产品文档中的并发控制一致。
- * 名额：max_pairs 表示「配对数」，单场最多 max_pairs * 2 人（每人占 1 个 booked_count）。
+ * 预约：事务 + SELECT … FOR UPDATE 锁定场次行，防止超卖（PostgreSQL）。
  */
 
-function bookTimeslot(db, userId, timeslotId, level) {
-  db.exec("BEGIN IMMEDIATE");
+async function bookTimeslot(pool, userId, timeslotId, level) {
+  const client = await pool.connect();
   try {
-    const slot = db
-      .prepare("SELECT id, booked_count, max_pairs, status FROM timeslots WHERE id = ?")
-      .get(timeslotId);
+    await client.query("BEGIN");
+    const { rows } = await client.query(
+      "SELECT id, booked_count, max_pairs, status FROM timeslots WHERE id = $1 FOR UPDATE",
+      [timeslotId]
+    );
+    const slot = rows[0];
 
     if (!slot) {
       const e = new Error("场次不存在");
@@ -20,18 +22,19 @@ function bookTimeslot(db, userId, timeslotId, level) {
       e.code = "CLOSED";
       throw e;
     }
-    if (slot.booked_count >= slot.max_pairs * 2) {
+    if (Number(slot.booked_count) >= Number(slot.max_pairs) * 2) {
       const e = new Error("名额已满");
       e.code = "FULL";
       throw e;
     }
 
     try {
-      db.prepare(
-        "INSERT INTO bookings (user_id, timeslot_id, level, status) VALUES (?, ?, ?, 'confirmed')"
-      ).run(userId, timeslotId, level);
+      await client.query(
+        `INSERT INTO bookings (user_id, timeslot_id, level, status) VALUES ($1, $2, $3, 'confirmed')`,
+        [userId, timeslotId, level]
+      );
     } catch (insErr) {
-      if (insErr && (String(insErr.message).includes("UNIQUE") || String(insErr.code).includes("CONSTRAINT"))) {
+      if (insErr && insErr.code === "23505") {
         const e = new Error("您已预约该场次");
         e.code = "DUP";
         throw e;
@@ -39,26 +42,29 @@ function bookTimeslot(db, userId, timeslotId, level) {
       throw insErr;
     }
 
-    const upd = db
-      .prepare(
-        "UPDATE timeslots SET booked_count = booked_count + 1 WHERE id = ? AND status = 'open' AND booked_count < max_pairs * 2"
-      )
-      .run(timeslotId);
+    const upd = await client.query(
+      `UPDATE timeslots SET booked_count = booked_count + 1
+       WHERE id = $1 AND status = 'open' AND booked_count < max_pairs * 2
+       RETURNING id`,
+      [timeslotId]
+    );
 
-    if (upd.changes !== 1) {
+    if (upd.rowCount !== 1) {
       const e = new Error("名额已满");
       e.code = "FULL";
       throw e;
     }
 
-    db.exec("COMMIT");
+    await client.query("COMMIT");
   } catch (e) {
     try {
-      db.exec("ROLLBACK");
+      await client.query("ROLLBACK");
     } catch (_) {
       /* ignore */
     }
     throw e;
+  } finally {
+    client.release();
   }
 }
 

@@ -1,5 +1,5 @@
 const express = require("express");
-const { getDb } = require("../db");
+const { getPool } = require("../db");
 const { requireAuth } = require("../middleware/requireAuth");
 const { bookTimeslot } = require("../services/bookTransaction");
 
@@ -13,11 +13,7 @@ const LEVEL_MAP = {
 
 const ALLOWED_LEVELS = new Set(["beginner", "intermediate", "advanced"]);
 
-/**
- * POST /api/bookings
- * Body: { timeslot_id, level } — level 可为前端 beginner/mid/adv 或已是库内枚举。
- */
-router.post("/", requireAuth, (req, res) => {
+router.post("/", requireAuth, async (req, res) => {
   const timeslotId = Number(req.body?.timeslot_id);
   const rawLevel = String(req.body?.level || "").trim();
   const level = LEVEL_MAP[rawLevel] || rawLevel;
@@ -27,7 +23,7 @@ router.post("/", requireAuth, (req, res) => {
   }
 
   try {
-    bookTimeslot(getDb(), req.user.id, timeslotId, level);
+    await bookTimeslot(getPool(), req.user.id, timeslotId, level);
     res.json({ code: 0, message: "ok", data: null });
   } catch (e) {
     const map = {
@@ -45,50 +41,31 @@ router.post("/", requireAuth, (req, res) => {
   }
 });
 
-/**
- * GET /api/bookings/mine
- * 含搭档信息（若 pairs 已生成）；供「我的预约」短轮询。
- */
-router.get("/mine", requireAuth, (req, res) => {
-  const db = getDb();
-  const uid = req.user.id;
+router.get("/mine", requireAuth, async (req, res) => {
+  try {
+    const pool = getPool();
+    const uid = req.user.id;
 
-  const rows = db
-    .prepare(
+    const { rows } = await pool.query(
       `SELECT b.id, b.timeslot_id, b.level, b.status AS booking_status, b.created_at,
         t.start_time, t.end_time, t.status AS slot_status, t.booked_count, t.max_pairs,
-        th.name AS theme_name
+        th.name AS theme_name,
+        CASE WHEN p.user_a = $1 THEN ub.nickname WHEN p.user_b = $1 THEN ua.nickname END AS partner_nickname,
+        CASE WHEN p.user_a = $1 THEN ub.credit_score WHEN p.user_b = $1 THEN ua.credit_score END AS partner_credit_score,
+        p.channel_name,
+        p.status AS pair_status
        FROM bookings b
        JOIN timeslots t ON t.id = b.timeslot_id
        JOIN themes th ON th.id = t.theme_id
-       WHERE b.user_id = ? AND b.status = 'confirmed'
-       ORDER BY t.start_time ASC`
-    )
-    .all(uid);
+       LEFT JOIN pairs p ON p.timeslot_id = b.timeslot_id AND (p.user_a = $1 OR p.user_b = $1)
+       LEFT JOIN users ua ON ua.id = p.user_a
+       LEFT JOIN users ub ON ub.id = p.user_b
+       WHERE b.user_id = $1 AND b.status = 'confirmed'
+       ORDER BY t.start_time ASC`,
+      [uid]
+    );
 
-  const pairStmt = db.prepare(
-    `SELECT user_a, user_b, channel_name, status FROM pairs
-     WHERE timeslot_id = ? AND (user_a = ? OR user_b = ?)`
-  );
-  const userStmt = db.prepare("SELECT id, nickname, credit_score FROM users WHERE id = ?");
-
-  const bookings = rows.map((row) => {
-    const pair = pairStmt.get(row.timeslot_id, uid, uid);
-    let partnerNickname = null;
-    let partnerCreditScore = null;
-    let channelName = null;
-    let pairStatus = null;
-    if (pair) {
-      pairStatus = pair.status;
-      channelName = pair.channel_name;
-      const pid = pair.user_a === uid ? pair.user_b : pair.user_a;
-      const pu = userStmt.get(pid);
-      if (pu) {
-        partnerNickname = pu.nickname;
-        partnerCreditScore = pu.credit_score;
-      }
-    }
-    return {
+    const bookings = rows.map((row) => ({
       id: row.id,
       timeslotId: row.timeslot_id,
       level: row.level,
@@ -100,14 +77,17 @@ router.get("/mine", requireAuth, (req, res) => {
       bookedCount: row.booked_count,
       maxPairs: row.max_pairs,
       themeName: row.theme_name,
-      partnerNickname,
-      partnerCreditScore,
-      channelName,
-      pairStatus,
-    };
-  });
+      partnerNickname: row.partner_nickname,
+      partnerCreditScore: row.partner_credit_score,
+      channelName: row.channel_name,
+      pairStatus: row.pair_status,
+    }));
 
-  res.json({ code: 0, message: "ok", data: { bookings } });
+    res.json({ code: 0, message: "ok", data: { bookings } });
+  } catch (e) {
+    console.error("[bookings] mine", e);
+    res.status(500).json({ code: 500, message: "服务器错误", data: null });
+  }
 });
 
 module.exports = router;

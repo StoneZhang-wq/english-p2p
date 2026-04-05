@@ -1,6 +1,5 @@
--- 英语口语真人匹配平台 — SQLite 初始化脚本
+-- 英语口语真人匹配平台 — SQLite 初始化脚本（历史参考，当前应用使用 PostgreSQL + db/schema.postgres.sql）
 -- 与 ARCHITECTURE.md 保持一致；迁移时请版本化
--- 部署（Railway Root=backend）使用 backend/schema.sql，请与此文件保持同步
 
 PRAGMA foreign_keys = ON;
 
