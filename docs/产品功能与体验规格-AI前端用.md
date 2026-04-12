@@ -160,6 +160,7 @@
 | GET | `/api/timeslots` | Query: **`theme_id`（必填）** |
 | POST | `/api/bookings` | Body: `timeslot_id`, `level`（`beginner` \| `intermediate` \| `advanced`） |
 | GET | `/api/bookings/mine` | 我的预约列表；含 `partnerNickname`、`channelName`、`pairStatus` 等（配对存在时） |
+| DELETE | `/api/cancel-booking/:id` | 取消本人预约（开场前）；服务端删除 `bookings` 行，故**可再次预约同一场次** |
 | POST | `/api/agora/rtc-token` | Body: `channelName`, `uid`；返回声网入会信息 |
 
 **统一响应形态**（常见）：`{ code, message, data }`；`code === 0` 为成功。
@@ -192,7 +193,7 @@
 2. 登录 / 注册 / `me` 拉信用分。  
 3. 首页主题列表（可先写死或接 DB 扩展）。  
 4. 预约页：`GET /api/themes/by-id` 渲染头图与场景 → `timeslots?theme_id=` 选档 → `POST /bookings`。  
-5. 我的预约：`GET /bookings/mine` + 状态文案 + 进房按钮（无 `channelName` 时禁用或提示「待配对」）。  
+5. 我的预约：`GET /api/bookings/mine` + 状态文案 + 进房（无 `channelName` 时置灰）+ `DELETE /api/cancel-booking/:id` 取消（二次确认）。  
 6. 房间页：展示 + `rtc-token` + 加入频道 + 麦克风（可选摄像头）+ iOS 横幅。  
 7. 结束双确认、信用分展示（待后端接口落地后对接）。
 

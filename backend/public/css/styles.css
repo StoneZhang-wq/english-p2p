@@ -912,6 +912,14 @@ img {
   cursor: pointer;
 }
 
+.btn-enter.btn-enter--disabled,
+.btn-enter:disabled {
+  opacity: 0.55;
+  cursor: not-allowed;
+  background: var(--blue-primary);
+  color: #fff;
+}
+
 .cancel-link {
   display: block;
   margin-top: 10px;

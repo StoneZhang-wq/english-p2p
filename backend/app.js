@@ -8,6 +8,7 @@ const { initDb, runWeeklyThemeMaintenance } = require("./db");
 const authRouter = require("./routes/auth");
 const timeslotsRouter = require("./routes/timeslots");
 const bookingsRouter = require("./routes/bookings");
+const cancelBookingRouter = require("./routes/cancelBooking");
 const agoraRouter = require("./routes/agora");
 const previewMaterialRouter = require("./routes/previewMaterial");
 const themesRouter = require("./routes/themes");
@@ -47,6 +48,7 @@ app.get("/api/health", (_req, res) => {
 app.use("/api/auth", authRouter);
 app.use("/api/timeslots", timeslotsRouter);
 app.use("/api/bookings", bookingsRouter);
+app.use("/api/cancel-booking", cancelBookingRouter);
 app.use("/api/agora", agoraRouter);
 app.use("/api/preview-material", previewMaterialRouter);
 app.use("/api/themes", themesRouter);

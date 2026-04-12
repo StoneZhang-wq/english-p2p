@@ -103,17 +103,36 @@
         : "搭档：配对完成后显示";
 
     var enter = "";
-    if (!past && b.channelName && myUid != null) {
-      var href =
-        "room.html?channel=" +
-        encodeURIComponent(b.channelName) +
-        "&uid=" +
-        encodeURIComponent(String(myUid));
-      enter = '<a class="btn-enter" href="' + href + '">进入房间</a>';
+    if (!past && myUid != null) {
+      if (b.channelName) {
+        var href =
+          "room.html?channel=" +
+          encodeURIComponent(b.channelName) +
+          "&uid=" +
+          encodeURIComponent(String(myUid));
+        enter = '<a class="btn-enter" href="' + href + '">进入房间</a>';
+      } else {
+        enter =
+          '<button type="button" class="btn-enter btn-enter--disabled" disabled aria-disabled="true" title="配对完成后可进入">进入房间</button>';
+      }
+    }
+
+    var cancelBlock = "";
+    if (!past) {
+      cancelBlock =
+        '<div class="cancel-flow">' +
+        '<button type="button" class="cancel-trigger">取消预约</button>' +
+        '<div class="cancel-panel" hidden>' +
+        '<p class="cancel-ask">确定取消该预约？取消后可再次预约其他场次。</p>' +
+        '<div class="cancel-btns">' +
+        '<button type="button" class="btn-cancel-dismiss">保留</button>' +
+        '<button type="button" class="btn-cancel-confirm">确定取消</button>' +
+        "</div></div></div>";
     }
 
     var art = document.createElement("article");
     art.className = "appt-card";
+    art.dataset.bookingId = String(b.id);
     art.innerHTML =
       '<div class="row-top">' +
       "<h2>" +
@@ -132,7 +151,8 @@
       "<br />" +
       partnerLine +
       "</div>" +
-      enter;
+      enter +
+      cancelBlock;
     return art;
   }
 
@@ -244,6 +264,71 @@
   }
 
   setTab("upcoming");
+
+  panelUp.addEventListener("click", function (ev) {
+    var el = ev.target;
+    if (!el || typeof el.closest !== "function") return;
+
+    var trigger = el.closest(".cancel-trigger");
+    if (trigger) {
+      var flow = trigger.closest(".cancel-flow");
+      if (flow) {
+        var pan = flow.querySelector(".cancel-panel");
+        if (pan) pan.hidden = false;
+      }
+      return;
+    }
+
+    var dismiss = el.closest(".btn-cancel-dismiss");
+    if (dismiss) {
+      var flow2 = dismiss.closest(".cancel-flow");
+      if (flow2) {
+        var pan2 = flow2.querySelector(".cancel-panel");
+        if (pan2) pan2.hidden = true;
+      }
+      return;
+    }
+
+    var confirmBtn = el.closest(".btn-cancel-confirm");
+    if (confirmBtn) {
+      var card = confirmBtn.closest("[data-booking-id]");
+      if (!card) return;
+      var bookingId = card.getAttribute("data-booking-id");
+      if (!bookingId) return;
+      confirmBtn.disabled = true;
+      fetch("/api/cancel-booking/" + encodeURIComponent(bookingId), {
+        method: "DELETE",
+        credentials: "include",
+        headers: { Accept: "application/json" },
+      })
+        .then(function (r) {
+          return r.json().then(function (j) {
+            return { ok: r.ok, status: r.status, j: j };
+          });
+        })
+        .then(function (x) {
+          if (x.status === 401) {
+            window.location.href = "login.html";
+            return;
+          }
+          if (!x.ok || x.j.code !== 0) {
+            setStatus(x.j.message || "取消失败", true);
+            confirmBtn.disabled = false;
+            return;
+          }
+          var flow3 = confirmBtn.closest(".cancel-flow");
+          if (flow3) {
+            var pan3 = flow3.querySelector(".cancel-panel");
+            if (pan3) pan3.hidden = true;
+          }
+          loadMine();
+        })
+        .catch(function () {
+          setStatus("网络异常，请稍后重试", true);
+          confirmBtn.disabled = false;
+        });
+    }
+  });
 
   fetchMeUid()
     .then(function () {

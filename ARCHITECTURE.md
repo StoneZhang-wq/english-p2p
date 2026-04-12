@@ -163,7 +163,7 @@ CREATE TABLE credit_logs (
 | GET | `/api/preview-material/docx` | Query：`theme_id`；**须登录**；正文来自 `themes.preview_markdown`，`docx` 包生成 |
 | POST | `/api/book` | Body：`timeslot_id`, `level`；**受预约截止与容量约束** |
 | GET | `/api/my-bookings` | 当前用户预约列表；**若已配对**，每条含 **搭档昵称 `partner_nickname`、搭档水平 `partner_level`**（不对用户暴露对方手机号） |
-| DELETE | `/api/cancel-booking/:id` | 取消预约（需校验归属与业务允许取消的时间窗，产品未定时可默认开场前均可取消，**截止预约不影响已确认预约的主动取消**，除非产品另定） |
+| DELETE | `/api/cancel-booking/:id` | 取消预约（`services/cancelBooking.js`）：须登录且预约归属当前用户；**场次开始时间（上海 naive）到达前**可取消；事务内 **DELETE** `bookings` 行（避免 `(user_user, timeslot_id)` 唯一约束阻碍再次预约）、`timeslots.booked_count - 1`、删除该用户在本场次上的 `pairs` 行 |
 | GET | `/api/my-pair` | Query：`timeslot_id`；返回 **channel_name、agora_app_id、agora_token（可选）、搭档昵称、搭档水平、双方任务卡/角色** |
 | POST | `/api/end-conversation` | Body：`pair_id`, `duration_seconds` 等；用于结算与信用分 |
 | GET | `/api/user/profile` | 昵称、信用分等 |
@@ -220,7 +220,7 @@ CREATE TABLE credit_logs (
 
 - **配对与停配**：建议**每 1 分钟**（或更短）扫描：距 `start_time` 已进入「可预约窗口内」的场次，对未配对集合执行增量配对；对 **`start_time - 60min`** 已过的场次执行停配扫描与第 7 节检查。
 - **开场落单互配**：在 `start_time`（或签到截止）到达时触发任务，读取签到状态，更新 `pairs` 并发送通知。
-- **事件驱动**：`POST /api/bookings` 成功、`DELETE` 取消预约（若实现）等路径**须入队或同步调用**配对尝试，以满足「尽早配对」与「取消后重配」。
+- **事件驱动**：`POST /api/bookings` 成功、`DELETE /api/cancel-booking/:id` 等路径**须入队或同步调用**配对尝试，以满足「尽早配对」与「取消后重配」（配对服务落地后接上）。
 - 时区：**Asia/Shanghai**。
 
 ### 6.6 周主题的「当前开放周」（`weekThemeCycle.js`）
