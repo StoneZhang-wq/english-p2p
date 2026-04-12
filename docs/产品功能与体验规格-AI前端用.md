@@ -161,13 +161,14 @@
 | POST | `/api/bookings` | Body: `timeslot_id`, `level`（`beginner` \| `intermediate` \| `advanced`） |
 | GET | `/api/bookings/mine` | 我的预约列表；含 `partnerNickname`、`channelName`、`pairStatus` 等（配对存在时） |
 | DELETE | `/api/cancel-booking/:id` | 取消本人预约（开场前）；服务端删除 `bookings` 行，故**可再次预约同一场次** |
+| POST | `/api/dev/pair-timeslot` | **仅开发**：`NODE_ENV !== 'production'` 或 `ENABLE_DEV_PAIRING=1` 时存在；须登录；Body `timeslot_id`；为当前用户与同场另一名**等级差≤1**的预约者写入 `pairs`（测「我的预约 → 进房」） |
 | POST | `/api/agora/rtc-token` | Body: `channelName`, `uid`；返回声网入会信息 |
 
 **统一响应形态**（常见）：`{ code, message, data }`；`code === 0` 为成功。
 
 **尚未实现或仅部分实现（前端需容错 / 占位）**：
 
-- 产品要求的 **`GET /api/my-pair`**、**`POST /api/end-conversation`**、**取消预约** 等与 `ARCHITECTURE.md` 第 5 节命名可能不一致，**以仓库 `backend/routes` 为准**。  
+- 产品要求的 **`GET /api/my-pair`**、**`POST /api/end-conversation`** 等与 `ARCHITECTURE.md` 第 5 节命名可能不一致，**以仓库 `backend/routes` 为准**；**取消预约** 已实现为 `DELETE /api/cancel-booking/:id`。  
 - **开场前 60 分钟截止预约**、**配对 Cron**、**邮件通知** 等可能未完备；UI 仍应按产品展示不可约原因、加载中与错误态。
 
 ---

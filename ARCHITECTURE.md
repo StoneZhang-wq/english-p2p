@@ -163,11 +163,17 @@ CREATE TABLE credit_logs (
 | GET | `/api/preview-material/docx` | Query：`theme_id`；**须登录**；正文来自 `themes.preview_markdown`，`docx` 包生成 |
 | POST | `/api/book` | Body：`timeslot_id`, `level`；**受预约截止与容量约束** |
 | GET | `/api/my-bookings` | 当前用户预约列表；**若已配对**，每条含 **搭档昵称 `partner_nickname`、搭档水平 `partner_level`**（不对用户暴露对方手机号） |
-| DELETE | `/api/cancel-booking/:id` | 取消预约（`services/cancelBooking.js`）：须登录且预约归属当前用户；**场次开始时间（上海 naive）到达前**可取消；事务内 **DELETE** `bookings` 行（避免 `(user_user, timeslot_id)` 唯一约束阻碍再次预约）、`timeslots.booked_count - 1`、删除该用户在本场次上的 `pairs` 行 |
+| DELETE | `/api/cancel-booking/:id` | 取消预约（`services/cancelBooking.js`）：须登录且预约归属当前用户；**场次开始时间（上海 naive）到达前**可取消；事务内 **DELETE** `bookings` 行（避免 `(user_id, timeslot_id)` 唯一约束阻碍再次预约）、`timeslots.booked_count - 1`、删除该用户在本场次上的 `pairs` 行 |
 | GET | `/api/my-pair` | Query：`timeslot_id`；返回 **channel_name、agora_app_id、agora_token（可选）、搭档昵称、搭档水平、双方任务卡/角色** |
 | POST | `/api/end-conversation` | Body：`pair_id`, `duration_seconds` 等；用于结算与信用分 |
 | GET | `/api/user/profile` | 昵称、信用分等 |
 | POST | `/api/agora/rtc-token` | Body：`{ channelName, uid }`；返回 `appId`、`channelName`、`token`、`uid`、`expiresIn`。**须开启声网 App Certificate**，Token 仅服务端生成；生产环境须叠加登录态与「用户属于该频道对应 pair」校验（当前为集成骨架） |
+
+**开发调试（非正式配对）**：当 `NODE_ENV !== 'production'` **或** `ENABLE_DEV_PAIRING=1` 时挂载 `routes/devPairing.js`（否则不注册该路径）：
+
+| 方法 | 路径 | 说明 |
+|------|------|------|
+| POST | `/api/dev/pair-timeslot` | Body：`{ timeslot_id }`（整数）。**须登录**；调用者须在该场次有 `confirmed` 预约，且存在另一名同场次预约者与其**口语等级差≤1**（`utils/levelCompatibility.js`）；事务内 **删除该场次全部 `pairs`** 后 **INSERT** 一行（`channel_name` 形如 `dev_eng_{timeslotId}_{ts}`，满足声网频道字符集）。**禁止**在生产长期开启 `ENABLE_DEV_PAIRING`；正式「尽早配对」仍须独立实现。 |
 
 ### 5.3 预约截止（强制）
 

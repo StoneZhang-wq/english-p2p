@@ -14,6 +14,10 @@ const previewMaterialRouter = require("./routes/previewMaterial");
 const themesRouter = require("./routes/themes");
 const { attachRoomTaskWebSocket } = require("./services/roomTaskWs");
 
+function isDevPairingApiEnabled() {
+  return process.env.ENABLE_DEV_PAIRING === "1" || process.env.NODE_ENV !== "production";
+}
+
 const app = express();
 app.set("trust proxy", 1);
 const PORT = Number(process.env.PORT) || 3000;
@@ -53,6 +57,13 @@ app.use("/api/agora", agoraRouter);
 app.use("/api/preview-material", previewMaterialRouter);
 app.use("/api/themes", themesRouter);
 
+if (isDevPairingApiEnabled()) {
+  app.use("/api/dev", require("./routes/devPairing"));
+  console.warn(
+    "[dev] POST /api/dev/pair-timeslot 已启用（NODE_ENV 非 production 或 ENABLE_DEV_PAIRING=1）。生产环境请勿开启调试开关。"
+  );
+}
+
 app.use((err, _req, res, _next) => {
   console.error("[express]", err);
   res.status(500).json({ code: 500, message: "服务器错误", data: null });
@@ -87,6 +98,9 @@ initDb()
       console.log("PostgreSQL: ready");
       if (!process.env.AGORA_APP_CERTIFICATE) {
         console.warn("[warn] 未设置 AGORA_APP_CERTIFICATE，/api/agora/rtc-token 将返回 503");
+      }
+      if (process.env.NODE_ENV === "production" && process.env.ENABLE_DEV_PAIRING === "1") {
+        console.warn("[warn] 生产环境已设置 ENABLE_DEV_PAIRING=1，调试配对接口暴露中，存在滥用风险");
       }
     });
 

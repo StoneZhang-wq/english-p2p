@@ -40,7 +40,24 @@ npm run dev
 
 启动与定时任务会按**周主题轮换规则**补全 `themes` / `timeslots`（见 `ARCHITECTURE.md`）。
 
-**尚未实现**（按 `ARCHITECTURE.md` 后续迭代）：开场前 cron 配对算法、`pairs` 写入、邮件通知、**`POST /api/agora/rtc-token` 与登录态及 pair 绑定校验**（当前仍为演示级 Token）。配对可用一般图最大匹配（等级差≤1）在 `O(n³)` 内完成。
+**尚未实现**（按 `ARCHITECTURE.md` 后续迭代）：开场前 cron **自动**配对、邮件通知、**`POST /api/agora/rtc-token` 与登录态及 pair 绑定校验**（当前仍为演示级 Token）。配对可用一般图最大匹配（等级差≤1）在 `O(n³)` 内完成。
+
+### 开发调试：一键写入 `pairs`（两名用户已约同一场）
+
+当 **`NODE_ENV` 不为 `production`**（例如本地 `npm run dev`）**或** 设置 **`ENABLE_DEV_PAIRING=1`** 时，服务端会挂载 **`POST /api/dev/pair-timeslot`**（见 `ARCHITECTURE.md` 5.2）。**须携带登录 Cookie**；Body 为 `{ "timeslot_id": <数字> }`。调用者本人须已在该场次预约，且存在另一名**等级差≤1**的已确认预约；成功后会清空该场次旧 `pairs` 并插入新行，便于测「我的预约 → 进入房间」。
+
+示例（在已登录浏览器的开发者工具 Console 中执行，或自行换 Cookie）：
+
+```javascript
+fetch("/api/dev/pair-timeslot", {
+  method: "POST",
+  credentials: "include",
+  headers: { "Content-Type": "application/json" },
+  body: JSON.stringify({ timeslot_id: 1 }),
+}).then((r) => r.json()).then(console.log);
+```
+
+**生产环境切勿**长期设置 `ENABLE_DEV_PAIRING=1`（接口无额外 RBAC，存在滥用风险）。
 
 ### 声网联调（免预约）
 
