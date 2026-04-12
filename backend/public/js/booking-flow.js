@@ -149,13 +149,32 @@
     return "已约 " + booked + " / " + cap + " 人";
   }
 
+  var SHANGHAI_TZ = "Asia/Shanghai";
+
   function formatSlotTime(startIso) {
     var st = parseDbTime(startIso);
     if (!st) return "—";
     function p2(n) {
       return n < 10 ? "0" + n : String(n);
     }
-    return p2(st.getHours()) + ":" + p2(st.getMinutes());
+    var mo = new Intl.DateTimeFormat("en-US", { timeZone: SHANGHAI_TZ, month: "2-digit" }).format(st);
+    var da = new Intl.DateTimeFormat("en-US", { timeZone: SHANGHAI_TZ, day: "2-digit" }).format(st);
+    var hh = new Intl.DateTimeFormat("en-US", {
+      timeZone: SHANGHAI_TZ,
+      hour: "2-digit",
+      hour12: false,
+    }).format(st);
+    var mm = new Intl.DateTimeFormat("en-US", { timeZone: SHANGHAI_TZ, minute: "2-digit" }).format(st);
+    return mo + "-" + da + " " + hh + ":" + mm;
+  }
+
+  function formatSlotWeekday(startIso) {
+    var st = parseDbTime(startIso);
+    if (!st) return "";
+    return new Intl.DateTimeFormat("zh-CN", {
+      timeZone: SHANGHAI_TZ,
+      weekday: "long",
+    }).format(st);
   }
 
   function renderSlots() {
@@ -170,7 +189,8 @@
       b.className = "slot-card" + (selectedSlotId === s.id ? " selected" : "") + (closedByTime ? " slot-card--closed" : "");
       b.disabled = disabled;
       b.dataset.timeslotId = String(s.id);
-      var timeStr = formatSlotTime(s.startTime);
+      var dateTimeStr = formatSlotTime(s.startTime);
+      var weekdayStr = formatSlotWeekday(s.startTime);
       var badge = closedByTime
         ? '<span class="slot-card__badge" aria-label="已截止预约">已截止</span>'
         : "";
@@ -182,9 +202,12 @@
             : "";
       b.innerHTML =
         badge +
-        '<div class="slot-card__time">' +
-        timeStr +
-        '</div><div class="slot-card__meta">' +
+        '<div class="slot-card__datetime">' +
+        '<div class="slot-card__date-line">' +
+        dateTimeStr +
+        '</div><div class="slot-card__weekday">' +
+        weekdayStr +
+        '</div></div><div class="slot-card__meta">' +
         (full ? "已满" : formatSlotMeta(s.bookedCount, s.maxPairs)) +
         "</div>" +
         subLine;

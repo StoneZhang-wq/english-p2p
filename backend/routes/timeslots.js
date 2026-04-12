@@ -1,5 +1,6 @@
 const express = require("express");
 const { getPool } = require("../db");
+const { isShanghaiSaturdayOrSundayEightPm } = require("../utils/weekendSlotRules");
 
 const router = express.Router();
 
@@ -44,12 +45,14 @@ router.get("/", async (req, res) => {
       [themeId]
     );
 
+    const filtered = rows.filter((r) => isShanghaiSaturdayOrSundayEightPm(r.start_time));
+
     res.json({
       code: 0,
       message: "ok",
       data: {
         theme: { id: theme.id, name: theme.name },
-        timeslots: rows.map((r) => ({
+        timeslots: filtered.map((r) => ({
           id: r.id,
           themeId: r.theme_id,
           startTime: r.start_time,

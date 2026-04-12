@@ -1,6 +1,7 @@
 const fs = require("fs");
 const path = require("path");
 const { Pool } = require("pg");
+const { generateShanghaiWeekendEightPmStarts } = require("./utils/weekendSlotRules");
 
 let pool;
 
@@ -71,24 +72,23 @@ async function seedDemoIfEmpty(p) {
       ('日常闲聊', '轻松的话题，分享生活趣事', 'beginner', 1)`);
   }
 
-  const { rows: ids } = await p.query("SELECT id FROM themes ORDER BY id LIMIT 3");
-  if (ids.length < 3) return;
+  const { rows: themeRows } = await p.query("SELECT id FROM themes WHERE is_active = 1 ORDER BY id");
+  if (themeRows.length === 0) return;
 
-  const a = Number(ids[0].id);
-  const b = Number(ids[1].id);
-  const c = Number(ids[2].id);
+  /** 每个主题若干次「上海周六/日 20:00」演示场次（空库时写入） */
+  const starts = generateShanghaiWeekendEightPmStarts(12, 56);
+  if (starts.length === 0) return;
 
-  await p.query(
-    `INSERT INTO timeslots (theme_id, start_time, end_time, max_pairs, booked_count, status) VALUES
-      ($1, NOW() + INTERVAL '1 day', NOW() + INTERVAL '1 day' + INTERVAL '1 hour', 5, 0, 'open'),
-      ($1, NOW() + INTERVAL '1 day' + INTERVAL '2 hours', NOW() + INTERVAL '1 day' + INTERVAL '3 hours', 5, 0, 'open'),
-      ($1, NOW() + INTERVAL '2 days', NOW() + INTERVAL '2 days' + INTERVAL '1 hour', 5, 0, 'open'),
-      ($2, NOW() + INTERVAL '1 day' + INTERVAL '4 hours', NOW() + INTERVAL '1 day' + INTERVAL '5 hours', 3, 0, 'open'),
-      ($2, NOW() + INTERVAL '3 days', NOW() + INTERVAL '3 days' + INTERVAL '1 hour', 3, 0, 'open'),
-      ($3, NOW() + INTERVAL '2 days' + INTERVAL '3 hours', NOW() + INTERVAL '2 days' + INTERVAL '4 hours', 5, 0, 'open'),
-      ($3, NOW() + INTERVAL '4 days', NOW() + INTERVAL '4 days' + INTERVAL '1 hour', 5, 0, 'open')`,
-    [a, b, c]
-  );
+  for (const row of themeRows) {
+    const themeId = Number(row.id);
+    for (const st of starts) {
+      const end = new Date(st.getTime() + 60 * 60 * 1000);
+      await p.query(
+        `INSERT INTO timeslots (theme_id, start_time, end_time, max_pairs, booked_count, status) VALUES ($1, $2, $3, 5, 0, 'open')`,
+        [themeId, st, end]
+      );
+    }
+  }
 }
 
 async function initDb() {

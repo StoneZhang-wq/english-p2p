@@ -489,15 +489,29 @@ img {
   transition: border-color 0.15s, background 0.15s, box-shadow 0.15s;
 }
 
-.slot-card__time {
-  font-size: 1.25rem;
+.slot-card__datetime {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+}
+
+.slot-card__date-line {
+  font-size: 1.0625rem;
   font-weight: 700;
   font-variant-numeric: tabular-nums;
   color: var(--text-primary);
+  letter-spacing: 0.02em;
+}
+
+.slot-card__weekday {
+  font-size: 0.75rem;
+  font-weight: 500;
+  color: var(--text-secondary);
 }
 
 .slot-card__meta {
-  margin-top: 6px;
+  margin-top: 8px;
   font-size: 0.75rem;
   color: var(--text-secondary);
 }
@@ -521,8 +535,12 @@ img {
   box-shadow: 0 0 0 1px rgba(79, 70, 229, 0.12);
 }
 
-.slot-card.selected .slot-card__time {
+.slot-card.selected .slot-card__date-line {
   color: var(--blue-soft-border);
+}
+
+.slot-card.selected .slot-card__weekday {
+  color: #6366f1;
 }
 
 .slot-card.selected .slot-card__meta,
