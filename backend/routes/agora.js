@@ -41,9 +41,11 @@ router.post("/rtc-token-booking", requireAuth, async (req, res) => {
     const rtcMode = paired ? "paired" : "waiting";
 
     const { rows: slotRows } = await pool.query(
-      `SELECT to_char(t.start_time, 'YYYY-MM-DD HH24:MI:SS') AS start_time,
+      `SELECT t.theme_id,
+              to_char(t.start_time, 'YYYY-MM-DD HH24:MI:SS') AS start_time,
               to_char(t.end_time, 'YYYY-MM-DD HH24:MI:SS') AS end_time,
-              COALESCE(th.is_sandbox, FALSE) AS is_sandbox
+              COALESCE(th.is_sandbox, FALSE) AS is_sandbox,
+              th.room_tasks_json
        FROM timeslots t
        JOIN themes th ON th.id = t.theme_id
        WHERE t.id = $1 LIMIT 1`,
@@ -51,6 +53,16 @@ router.post("/rtc-token-booking", requireAuth, async (req, res) => {
     );
     const slot = slotRows[0] || {};
     const isSandbox = slot.is_sandbox === true;
+    let roomTasks = null;
+    if (slot.room_tasks_json != null) {
+      try {
+        const raw = slot.room_tasks_json;
+        roomTasks = typeof raw === "string" ? JSON.parse(raw) : raw;
+        if (!Array.isArray(roomTasks)) roomTasks = null;
+      } catch {
+        roomTasks = null;
+      }
+    }
 
     const result = buildRtcToken(channelName, uid);
     res.json({
@@ -64,9 +76,11 @@ router.post("/rtc-token-booking", requireAuth, async (req, res) => {
         expiresIn: result.expiresIn,
         rtcMode,
         timeslotId: tid,
+        themeId: slot.theme_id != null ? Number(slot.theme_id) : null,
         startTime: slot.start_time || null,
         endTime: slot.end_time || null,
         isSandbox,
+        roomTasks,
       },
     });
   } catch (e) {

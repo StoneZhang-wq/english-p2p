@@ -8,6 +8,7 @@ const {
 } = require("./utils/weekThemeCycle");
 const { pickThreeForWeek } = require("./data/themeRotationPool");
 const { ensureSandboxLab } = require("./services/sandboxLab");
+const { tryEnrichThemesWithLlm } = require("./services/themeLlmEnrichment");
 
 let pool;
 
@@ -68,6 +69,12 @@ async function migrateUsersPasswordColumn(p) {
 
 async function migrateThemesSandboxFlag(p) {
   await p.query(`ALTER TABLE themes ADD COLUMN IF NOT EXISTS is_sandbox BOOLEAN NOT NULL DEFAULT FALSE`);
+}
+
+async function migrateThemesLlmColumns(p) {
+  await p.query(`ALTER TABLE themes ADD COLUMN IF NOT EXISTS room_tasks_json JSONB`);
+  await p.query(`ALTER TABLE themes ADD COLUMN IF NOT EXISTS llm_generated_at TIMESTAMPTZ`);
+  await p.query(`ALTER TABLE themes ADD COLUMN IF NOT EXISTS llm_prompt_version TEXT`);
 }
 
 async function migrateWeeklyThemesColumns(p) {
@@ -206,6 +213,14 @@ async function runWeeklyThemeMaintenance() {
   } finally {
     client.release();
   }
+  try {
+    const r = await tryEnrichThemesWithLlm(pool);
+    if (r && !r.skipped && r.processed > 0) {
+      console.log("[llm-theme] maintenance: processed=%s ok=%s fail=%s", r.processed, r.ok, r.fail);
+    }
+  } catch (e) {
+    console.warn("[llm-theme] maintenance enrich:", e && e.message ? e.message : e);
+  }
 }
 
 async function initDb() {
@@ -222,6 +237,7 @@ async function initDb() {
     await migrateUsersPasswordColumn(client);
     await migrateWeeklyThemesColumns(client);
     await migrateThemesSandboxFlag(client);
+    await migrateThemesLlmColumns(client);
     await client.query(
       `UPDATE themes SET is_active = 0 WHERE shanghai_week_monday IS NULL AND COALESCE(is_sandbox, FALSE) = FALSE`
     );
@@ -230,6 +246,15 @@ async function initDb() {
     await ensureSandboxLab(client);
   } finally {
     client.release();
+  }
+
+  try {
+    const r = await tryEnrichThemesWithLlm(pool);
+    if (r && !r.skipped && r.processed > 0) {
+      console.log("[llm-theme] init pass: processed=%s ok=%s fail=%s", r.processed, r.ok, r.fail);
+    }
+  } catch (e) {
+    console.warn("[llm-theme] init enrich:", e && e.message ? e.message : e);
   }
 }
 

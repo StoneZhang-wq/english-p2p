@@ -19,13 +19,26 @@ router.get("/by-id", async (req, res) => {
     const { rows } = await pool.query(
       `SELECT id, name, description, slug, theme_slot, scene_text, roles_json, cover_url, difficulty_level,
         is_active, shanghai_week_monday::text AS week_monday, preview_markdown,
-        COALESCE(is_sandbox, FALSE) AS is_sandbox
+        COALESCE(is_sandbox, FALSE) AS is_sandbox,
+        room_tasks_json,
+        llm_generated_at,
+        llm_prompt_version
        FROM themes WHERE id = $1`,
       [id]
     );
     const r = rows[0];
     if (!r) {
       return res.status(404).json({ code: 404, message: "主题不存在", data: null });
+    }
+    let roomTasks = null;
+    if (r.room_tasks_json != null) {
+      try {
+        const raw = r.room_tasks_json;
+        roomTasks = typeof raw === "string" ? JSON.parse(raw) : raw;
+        if (!Array.isArray(roomTasks)) roomTasks = null;
+      } catch {
+        roomTasks = null;
+      }
     }
     res.json({
       code: 0,
@@ -45,6 +58,9 @@ router.get("/by-id", async (req, res) => {
           isActive: Number(r.is_active) === 1,
           previewMarkdown: r.preview_markdown || "",
           isSandbox: Boolean(r.is_sandbox),
+          roomTasks,
+          llmGeneratedAt: r.llm_generated_at || null,
+          llmPromptVersion: r.llm_prompt_version || null,
         },
       },
     });

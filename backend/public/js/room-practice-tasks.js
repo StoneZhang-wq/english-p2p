@@ -146,5 +146,27 @@
   }
 
   window.__practiceTasksRefreshCount = updateTaskCount;
+
+  /**
+   * 由 room-agora 在 rtc-token-booking 返回 roomTasks 后调用；每项含 id、title（中文）、hints（英文数组）。
+   */
+  window.__applyRoomTasksFromApi = function (tasks) {
+    if (!list || !Array.isArray(tasks) || tasks.length === 0) return;
+    var normalized = tasks
+      .map(function (t) {
+        return {
+          id: String(t.id || ""),
+          title: String(t.title || ""),
+          hints: Array.isArray(t.hints) ? t.hints.map(String).filter(Boolean) : [],
+        };
+      })
+      .filter(function (t) {
+        return t.id && t.title && t.hints.length >= 2;
+      });
+    if (!normalized.length) return;
+    renderFromSet(normalized, 0);
+    showToast("已加载本主题的练习任务", false);
+  };
+
   updateTaskCount();
 })();

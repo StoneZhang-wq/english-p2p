@@ -26,7 +26,10 @@ CREATE TABLE IF NOT EXISTS themes (
   roles_json TEXT,
   cover_url TEXT,
   preview_markdown TEXT,
-  is_sandbox BOOLEAN NOT NULL DEFAULT FALSE
+  is_sandbox BOOLEAN NOT NULL DEFAULT FALSE,
+  room_tasks_json JSONB,
+  llm_generated_at TIMESTAMPTZ,
+  llm_prompt_version TEXT
 );
 
 -- 周主题唯一索引见 backend/db.js migrateWeeklyThemesColumns（须在 ALTER 之后执行）

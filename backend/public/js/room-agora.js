@@ -24,6 +24,7 @@
     lastRtcMode: null,
     waitUiWired: false,
     isSandbox: false,
+    roomTasksApplied: false,
   };
 
   var MATCH_TIPS_HTML = [
@@ -498,6 +499,10 @@
         state.isSandbox = !!cred.isSandbox;
         state.slotStartMs = parseShanghaiStartMs(cred.startTime);
         state.slotEndMs = parseShanghaiStartMs(cred.endTime);
+        if (!state.roomTasksApplied && cred.roomTasks && typeof window.__applyRoomTasksFromApi === "function") {
+          state.roomTasksApplied = true;
+          window.__applyRoomTasksFromApi(cred.roomTasks);
+        }
         if (cred.rtcMode === "waiting") {
           setPartnerLabel(state.isSandbox ? "沙箱：将直接连接等待大厅" : "开场后到点将连接语音");
         } else {

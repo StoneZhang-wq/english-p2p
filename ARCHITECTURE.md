@@ -175,6 +175,7 @@ CREATE TABLE credit_logs (
 | 方法 | 路径 | 说明 |
 |------|------|------|
 | POST | `/api/dev/pair-timeslot` | Body：`{ timeslot_id }`（整数）。**须登录**；调用者须在该场次有 `confirmed` 预约，且存在另一名同场次预约者与其**口语等级差≤1**（`utils/levelCompatibility.js`）；事务内 **删除该场次全部 `pairs`** 后 **INSERT** 一行（`channel_name` 形如 `dev_eng_{timeslotId}_{ts}`，满足声网频道字符集）。**禁止**在生产长期开启 `ENABLE_DEV_PAIRING`；用于**早于开场**强制造 `pairs` 的调试，与正常「开场后 `runAutoPairingScan`」不同。 |
+| POST | `/api/dev/theme-llm-rerun` | Body：`{ theme_id }`（整数）。**须登录**；清空该主题 `llm_generated_at` / `room_tasks_json` / `llm_prompt_version` 并**立即**调用 LLM 写回（**消耗额度**）。仅**非沙箱**且 `shanghai_week_monday` 非空之主题；与 `pair-timeslot` 同开关（`NODE_ENV` 非 production 或 `ENABLE_DEV_PAIRING=1`）。 |
 
 **沙箱实验室（见第 6.7 节）**：**已实现** — `GET /api/dev/sandbox-lab`、`POST /api/dev/sandbox-slot/refresh`（须登录；仅非生产或 `ENABLE_SANDBOX_LAB=1`）；`public/dev-lab.html`；`themes.is_sandbox`、`services/sandboxLab.js`、`initDb` 内 `ensureSandboxLab`。
 
@@ -252,19 +253,20 @@ CREATE TABLE credit_logs (
 | 房间 RTC | `rtc-token-booking` 响应 **`isSandbox`**；`room-agora.js` 对沙箱 **waiting** 直接 join 等待大厅，不延迟到 `startTime` |
 | 入口 | **`public/dev-lab.html`**；首页底部链到沙箱页 |
 
-### 6.8 LLM 内容生成 — 豆包（规划，与 `docs/产品描述.md` 第 8.3 节一致）
+### 6.8 LLM 内容生成（OpenAI 兼容接口，与 `docs/产品描述.md` 第 8.3 节一致）
 
-**目标**：主题名、描述、预习 Markdown、房间内任务与常用句等由服务端调用 **火山引擎豆包** API 生成或润色后**落库**，前端只读接口或既有 `themes` 字段。
+**目标**：主题名、描述、场景、角色、预习 Markdown、封面 URL、**房间内 3 条任务 + 英文 hints** 由服务端调用 **OpenAI Chat Completions 兼容** API（豆包方舟等）生成后**落库**；前端通过 `GET /api/themes/by-id` 与 **`POST /api/agora/rtc-token-booking`** 的 `roomTasks` 字段读取。
 
-**建议工程拆分**：
+**已实现**：
 
-| 项 | 约定 |
+| 项 | 实现 |
 |----|------|
-| 凭据 | `DOUBAO_API_KEY`（或火山统一 `ARK_API_KEY` 等以实际控制台为准）、可选 `DOUBAO_ENDPOINT` / 模型 ID；**禁止**把 Key 写入前端或仓库 |
-| 服务模块 | 新建 `services/doubaoClient.js`（或 `llm/doubao.js`）：封装请求、超时、重试、日志脱敏 |
-| 输出与存储 | 结构化 JSON（任务 id、标题、hints 数组）经校验后写入 **`themes` 扩展列**（如 `room_tasks_json JSONB`）或独立表 `theme_room_tasks`；`preview_markdown` 仍由现有 docx 路由读取 |
-| 触发方式 | **批量**：周维护任务前生成草稿；**按需**：管理脚本调用；**禁止**用户匿名接口直接烧额度 |
-| 可观测性 | 记录 `prompt_version`、`generated_at`；失败时降级为上一版或 `themeRotationPool` 静态兜底 |
+| 凭据与端点 | 环境变量 **`OPENAI_API_KEY`**、**`OPENAI_BASE_URL`**（可填完整 `.../chat/completions` 或只填 `https://ark.../api/v3`）、**`OPENAI_MODEL`**（方舟常为 `ep-xxxx`）；可选 **`MODEL_PROVIDER`**（日志用，如 `doubao`） |
+| 服务模块 | `services/llmChat.js`（HTTP `fetch`）、`services/themeLlmEnrichment.js`（提示词、JSON 校验、`tryEnrichThemesWithLlm`） |
+| 存储 | `themes.room_tasks_json`（JSONB）、`themes.llm_generated_at`、`themes.llm_prompt_version`；其余覆盖 `name`、`description`、`scene_text`、`roles_json`、`preview_markdown`、`cover_url`、`difficulty_level` |
+| 触发 | **`initDb` 结束后**尝试一轮；**`runWeeklyThemeMaintenance`（每 10 分钟）**后再尝试；每次最多 **3** 条 `llm_generated_at IS NULL` 且**非沙箱**的周主题 |
+| 房间展示 | `room-agora.js` 首次 `rtc-token-booking` 成功后调用 `window.__applyRoomTasksFromApi(roomTasks)`；无 `room_tasks_json` 时保留 `room.html` 默认静态任务 |
+| 未配置 Key | `tryEnrichThemesWithLlm` 直接跳过；种子数据仍来自 `themeRotationPool` |
 
 ---
 
@@ -293,9 +295,25 @@ SMS_ACCESS_SECRET=
 # 以下为规划能力（未实现时留空即可）
 ENABLE_DEV_PAIRING=0
 ENABLE_SANDBOX_LAB=0
+# LLM（OpenAI 兼容：豆包方舟等）。未配置或占位 Key 时不调用，主题仍为轮换池静态种子。
+MODEL_PROVIDER=doubao
+OPENAI_API_KEY=
+OPENAI_BASE_URL=https://ark.cn-beijing.volces.com/api/v3
+OPENAI_MODEL=
 DOUBAO_API_KEY=
 # DOUBAO_ENDPOINT=   # 若与默认火山方舟网关不同再填
 ```
+
+### 8.1 线上（`NODE_ENV=production`）验收沙箱时的环境变量
+
+在 **Railway 等生产环境** 默认**不会**挂载 `/api/dev/sandbox-*` 与 `/api/dev/pair-timeslot`（因 `NODE_ENV` 为 `production`）。若要在**线上**使用沙箱页与接口，须在部署平台**显式**设置：
+
+| 变量 | 是否必填（线上测沙箱） | 说明 |
+|------|------------------------|------|
+| **`ENABLE_SANDBOX_LAB=1`** | **必填** | 否则 `GET /api/dev/sandbox-lab`、`POST /api/dev/sandbox-slot/refresh` 不注册，`dev-lab.html` 会报网络/404 类错误。 |
+| **`ENABLE_DEV_PAIRING=1`** | **可选** | 仅在需要在**场次尚未进入「已开始」窗口」**时，用 `POST /api/dev/pair-timeslot` **手动**写入 `pairs` 时打开；若只等 `runAutoPairingScan` 自动配对，可不设。生产长期开启有滥用风险，验收后应改回 `0` 或删除。 |
+
+另须将浏览器访问的 **Origin**（如 `https://xxx.up.railway.app`）加入 **`CORS_ORIGINS`**（逗号分隔），且 Cookie 登录与同源/跨域策略一致。
 
 ---
 
@@ -331,7 +349,7 @@ DOUBAO_API_KEY=
 | 房间页 | `public/room.html`、`js/room-agora.js`（`timeslot_id` 轮询切频道）、`js/room-practice-tasks.js`（TASKS 列表、常用句折叠、演示刷新/模拟）、`js/room-tasks.js`（CLAIM 信令）、`services/roomTaskWs.js` |
 | 信用分结算 | `credit_logs` 表已建；**无** `POST /api/end-conversation` 等与产品一致的结算链路 |
 | 沙箱实验室 | 产品第 5.6 节、本文第 6.7 节 | **已有**：`is_sandbox`、`sandboxLab.js`、`dev-lab.html`、`GET/POST /api/dev/sandbox-*`、预约/场次/进房例外 |
-| LLM（豆包）写主题/预习/房间任务 | 产品第 8.3 节、本文第 6.8 节 | **未实现**：`services/doubaoClient.js`、环境变量、库表扩展与写入管线 |
+| LLM（OpenAI 兼容：豆包方舟等）写主题/预习/房间任务 | 产品第 8.3 节、本文第 6.8 节 | **已实现**：`services/llmChat.js`、`services/themeLlmEnrichment.js`；`OPENAI_*` / `MODEL_PROVIDER`；`themes.room_tasks_json`、`llm_generated_at`、`llm_prompt_version`；`rtc-token-booking` 返回 `roomTasks` |
 
 **与外部「全栈方案讨论」的差异**：本仓库前端为 **原生 JS**（非 React/Vue 必选）；配对策略以 **`docs/产品描述.md` 第 5.3、9 节** 为准（**开场到点后首轮配对** + 停配 + 开场互配）；主题 **MVP 为固定集**（非 AI 自动生成档期）。若产品决策变更，先改 `docs/产品描述.md` 再改实现。
 
