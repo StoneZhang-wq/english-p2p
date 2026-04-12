@@ -130,14 +130,25 @@
     function p2(n) {
       return n < 10 ? "0" + n : String(n);
     }
-    var mo = new Intl.DateTimeFormat("en-US", { timeZone: SHANGHAI_TZ, month: "2-digit" }).format(st);
-    var da = new Intl.DateTimeFormat("en-US", { timeZone: SHANGHAI_TZ, day: "2-digit" }).format(st);
-    var hh = new Intl.DateTimeFormat("en-US", {
+    var parts = new Intl.DateTimeFormat("en-US", {
       timeZone: SHANGHAI_TZ,
+      month: "2-digit",
+      day: "2-digit",
       hour: "2-digit",
+      minute: "2-digit",
       hour12: false,
-    }).format(st);
-    var mm = new Intl.DateTimeFormat("en-US", { timeZone: SHANGHAI_TZ, minute: "2-digit" }).format(st);
+    }).formatToParts(st);
+    var mo = "",
+      da = "",
+      hh = "",
+      mm = "";
+    for (var i = 0; i < parts.length; i++) {
+      var p = parts[i];
+      if (p.type === "month") mo = p.value;
+      if (p.type === "day") da = p.value;
+      if (p.type === "hour") hh = p2(Number(p.value));
+      if (p.type === "minute") mm = p2(Number(p.value));
+    }
     return mo + "-" + da + " " + hh + ":" + mm;
   }
 

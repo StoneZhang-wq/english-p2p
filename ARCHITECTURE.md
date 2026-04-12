@@ -157,8 +157,7 @@ CREATE TABLE credit_logs (
 |------|------|------|
 | POST | `/api/send-code` | 发送验证码（手机号或邮箱） |
 | POST | `/api/login` | 验证码登录，返回会话 Token |
-| GET | `/api/themes` | 主题列表 |
-| GET | `/api/themes` | 当前开放周期内**三个**周主题（见 `weekThemeCycle.js`）；未到周日 19:00（上海）则 `themes` 为空并带说明文案 |
+| GET | `/api/themes` | 当前开放周期内**三个**周主题（`weekThemeCycle.js` 的 `getActiveThemeWeekMondayNow`）；未到首次开放点则 `themes` 为空并带说明；**周日 19:00～21:00（上海）**若与「本周」周期尾重叠，取**周一 YMD 最大**的候选周（见第 6.6 节） |
 | GET | `/api/themes/by-id` | Query：`id`=`theme_id`；预约页拉取展示字段（含 `preview_markdown`、已归档亦可读） |
 | GET | `/api/timeslots` | Query：**`theme_id`（必填）**；仅返回 **北京时间周六、日 20:00 开场** 的 `open` 场次（`weekendSlotRules.js` 过滤）。库内 `timestamp without time zone`；`to_char` 读出字符串再过滤，避免 UTC 下 `Date` 误判 |
 | GET | `/api/preview-material/docx` | Query：`theme_id`；**须登录**；正文来自 `themes.preview_markdown`，`docx` 包生成 |
@@ -223,6 +222,11 @@ CREATE TABLE credit_logs (
 - **开场落单互配**：在 `start_time`（或签到截止）到达时触发任务，读取签到状态，更新 `pairs` 并发送通知。
 - **事件驱动**：`POST /api/bookings` 成功、`DELETE` 取消预约（若实现）等路径**须入队或同步调用**配对尝试，以满足「尽早配对」与「取消后重配」。
 - 时区：**Asia/Shanghai**。
+
+### 6.6 周主题的「当前开放周」（`weekThemeCycle.js`）
+
+- **`getActiveThemeWeekMondayNow()`**：在所有满足「已过该周 `bookingOpensAt`」且「当前时刻早于该周 `weekCycleEndsAt`」的上海周一起算的自然周中，返回 **周一 `YYYY-MM-DD` 最大**的一周。避免周日 19:00 起下一周已开放、但本周周期尚未到周日 21:00 结束时，仍把「本周」当作活跃周而导致首页与预约仅展示**已截止**的本周场次。
+- **`getWeekMondaysToEnsure()`**：可返回**多个**周（含重叠窗口内的两周），供启动/定时任务补全 `themes` 与 `timeslots`。
 
 ---
 

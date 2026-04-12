@@ -84,6 +84,9 @@ function weekendEightPmSlotsInWeek(weekMondayYmd) {
 /**
  * 当前应展示/预约的「周一起算的一周」的周一 YMD（上海）。
  * 条件：已过该周的 bookingOpensAt，且尚未过该周的 cycleEndsAt。
+ *
+ * 周日 19:00 起会同时满足「本周」与「下周」的开放条件（本周周期要到周日 21:00 才结束）。
+ * 产品要求此时应展示**下一周**主题与场次，故在多个候选周中取 **周一日期最大** 的一周。
  */
 function getActiveThemeWeekMondayNow() {
   const now = Date.now();
@@ -91,15 +94,18 @@ function getActiveThemeWeekMondayNow() {
   const baseMon = mondayOfShanghaiWeekContainingYmd(todayY);
   if (!baseMon) return null;
 
-  for (let off = -21; off <= 28; off += 7) {
+  let best = null;
+  for (let off = -28; off <= 42; off += 7) {
     const M = addCalendarDaysYmd(baseMon, off);
     if (!M) continue;
     const open = bookingOpensAtForWeekMonday(M);
     const end = weekCycleEndsAtForWeekMonday(M);
     if (!open || !end) continue;
-    if (open.getTime() <= now && now < end.getTime()) return M;
+    if (open.getTime() > now) continue;
+    if (end.getTime() <= now) continue;
+    if (!best || M > best) best = M;
   }
-  return null;
+  return best;
 }
 
 /**

@@ -47,19 +47,29 @@
     if (!iso) return "—";
     var d = parseDbTime(iso);
     if (!d) return String(iso);
+    function p2(n) {
+      return n < 10 ? "0" + n : String(n);
+    }
     var ymd = new Intl.DateTimeFormat("en-CA", {
       timeZone: SHANGHAI_TZ,
       year: "numeric",
       month: "2-digit",
       day: "2-digit",
     }).format(d);
-    var hm = new Intl.DateTimeFormat("en-US", {
+    var parts = new Intl.DateTimeFormat("en-US", {
       timeZone: SHANGHAI_TZ,
       hour: "2-digit",
       minute: "2-digit",
       hour12: false,
-    }).format(d);
-    return ymd + " " + hm;
+    }).formatToParts(d);
+    var hh = "",
+      mm = "";
+    for (var i = 0; i < parts.length; i++) {
+      var p = parts[i];
+      if (p.type === "hour") hh = p2(Number(p.value));
+      if (p.type === "minute") mm = p2(Number(p.value));
+    }
+    return ymd + " " + hh + ":" + mm;
   }
 
   function isPastBooking(b) {
