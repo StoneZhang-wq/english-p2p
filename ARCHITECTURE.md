@@ -19,7 +19,6 @@
 | 前端 | HTML5 + CSS3 + **原生 JavaScript**（可选后续引入 Vue 3 CDN），响应式 flex/grid，**主视口宽度 &lt; 600px** 优先 |
 | 后端 | **Node.js + Express** |
 | 数据库 | **PostgreSQL**（`pg` + `DATABASE_URL`）；`db/schema.postgres.sql` 建表 |
-| PDF 预习资料 | **`pdfkit`**（`GET /api/study-materials/pdf`）；中文字体与 `STUDY_MATERIAL_FONT_URL` 见 **5.2** 该条说明 |
 | 实时语音 | **Agora RTC Web SDK v4.x** |
 | 通知 | **Nodemailer**（邮件）；后续可选阿里云/腾讯云短信 |
 | 部署 | 轻量云服务器 + **Nginx** 反向代理 + **PM2** 守护 |
@@ -38,8 +37,8 @@ project-root/
 │   ├── routes/           # API 路由
 │   ├── controllers/      # 业务逻辑
 │   ├── models/           # 数据访问（PostgreSQL / pg）
-│   ├── services/         # 邮件、短信、Agora Token 等
-│   ├── data/             # 静态业务数据（如 `studyMaterials.js` 预习正文，与前端保持同步）
+│   ├── services/         # 邮件、短信、Agora Token、**预习 docx 生成**（`buildPreviewMaterialDocx.js`）等
+│   ├── data/             # 静态配置（如 `previewMaterials.js` 与各主题 Markdown 正文，供 docx 与前端预览同步）
 │   ├── utils/            # 验证码、配对算法、**周末场次规则**（`weekendSlotRules.js`）等
 │   ├── cron/             # 定时任务（配对、停配扫描、开场互配等）
 │   ├── public/           # 前端静态页（HTML/CSS/JS，express.static）
@@ -160,7 +159,7 @@ CREATE TABLE credit_logs (
 | POST | `/api/login` | 验证码登录，返回会话 Token |
 | GET | `/api/themes` | 主题列表 |
 | GET | `/api/timeslots` | Query：`theme_id`，可选 `theme`；仅返回 **北京时间周六、日 20:00 开场** 的 `open` 场次（`weekendSlotRules.js` 过滤）。库内为 `timestamp without time zone`（上海墙上时钟）；查询用 `to_char` 取字符串再过滤，避免 **Node 默认 UTC** 下 `Date` 误解析导致列表被滤空 |
-| GET | `/api/study-materials/pdf` | Cookie 登录态；Query：`theme`=`interview` \| `ielts` \| `chat`。须已有对应中文主题名的 **confirmed** 预约；返回 **PDF**（`pdfkit` + `services/studyMaterialPdf.js`）。中文用 **NotoSansCJKsc-Regular.otf**，默认首次从 GitHub raw 拉取并**进程内缓存**（约 16MB，冷启动首包较慢）；可设 **`STUDY_MATERIAL_FONT_URL`** 指向镜像或容器内字体路径。正文数据源：`data/studyMaterials.js`（与 `public/js/booking-flow.js` 预习 Markdown 保持同步） |
+| GET | `/api/preview-material/docx` | Query：`theme`=`interview` \| `ielts` \| `chat`；**须登录**（Cookie）；返回 **Word `.docx`**（`docx` + `data/previewMaterials.js`） |
 | POST | `/api/book` | Body：`timeslot_id`, `level`；**受预约截止与容量约束** |
 | GET | `/api/my-bookings` | 当前用户预约列表；**若已配对**，每条含 **搭档昵称 `partner_nickname`、搭档水平 `partner_level`**（不对用户暴露对方手机号） |
 | DELETE | `/api/cancel-booking/:id` | 取消预约（需校验归属与业务允许取消的时间窗，产品未定时可默认开场前均可取消，**截止预约不影响已确认预约的主动取消**，除非产品另定） |
@@ -247,8 +246,6 @@ AGORA_APP_ID=
 AGORA_CERTIFICATE=
 SMS_ACCESS_KEY_ID=
 SMS_ACCESS_SECRET=
-# 可选：预习 PDF 用中文字体 OTF 的 URL（默认从 GitHub raw 拉 NotoSansCJKsc-Regular，首包约 16MB）
-# STUDY_MATERIAL_FONT_URL=https://example.com/NotoSansCJKsc-Regular.otf
 ```
 
 ---
@@ -281,7 +278,6 @@ SMS_ACCESS_SECRET=
 | 预约截止 60 分钟 | **未做**：`bookTransaction` / `timeslots` 路由未按 `Asia/Shanghai` 与 `start_time` 拦截 |
 | 配对（尽早 / 取消重配 / 停配 / 开场互配） | **未做**：无 `cron/` 与事件驱动配对、`pairs` 写入与通知发送 |
 | 我的预约 | `GET /api/bookings/mine`：含 `LEFT JOIN pairs` 展示搭档昵称等（若库中已有配对行） |
-| 预习资料 PDF | `GET /api/study-materials/pdf` + `services/studyMaterialPdf.js` + `data/studyMaterials.js`；已登录且该主题有 **confirmed** 预约方可下载 |
 | Agora | `POST /api/agora/rtc-token`：需 `AGORA_APP_CERTIFICATE`；**须补**登录用户与 `channel_name` 所属 `pairs` 的校验（见 `routes/agora.js` 注释） |
 | 房间页 | `public/room.html`、`js/room-agora.js`、`js/room-tasks.js`、`services/roomTaskWs.js` |
 | 信用分结算 | `credit_logs` 表已建；**无** `POST /api/end-conversation` 等与产品一致的结算链路 |

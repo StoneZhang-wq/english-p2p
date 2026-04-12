@@ -8,8 +8,8 @@ const { initDb } = require("./db");
 const authRouter = require("./routes/auth");
 const timeslotsRouter = require("./routes/timeslots");
 const bookingsRouter = require("./routes/bookings");
-const studyMaterialsRouter = require("./routes/studyMaterials");
 const agoraRouter = require("./routes/agora");
+const previewMaterialRouter = require("./routes/previewMaterial");
 const { attachRoomTaskWebSocket } = require("./services/roomTaskWs");
 
 const app = express();
@@ -46,8 +46,8 @@ app.get("/api/health", (_req, res) => {
 app.use("/api/auth", authRouter);
 app.use("/api/timeslots", timeslotsRouter);
 app.use("/api/bookings", bookingsRouter);
-app.use("/api/study-materials", studyMaterialsRouter);
 app.use("/api/agora", agoraRouter);
+app.use("/api/preview-material", previewMaterialRouter);
 
 app.use((err, _req, res, _next) => {
   console.error("[express]", err);
