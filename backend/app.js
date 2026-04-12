@@ -8,6 +8,7 @@ const { initDb } = require("./db");
 const authRouter = require("./routes/auth");
 const timeslotsRouter = require("./routes/timeslots");
 const bookingsRouter = require("./routes/bookings");
+const studyMaterialsRouter = require("./routes/studyMaterials");
 const agoraRouter = require("./routes/agora");
 const { attachRoomTaskWebSocket } = require("./services/roomTaskWs");
 
@@ -45,6 +46,7 @@ app.get("/api/health", (_req, res) => {
 app.use("/api/auth", authRouter);
 app.use("/api/timeslots", timeslotsRouter);
 app.use("/api/bookings", bookingsRouter);
+app.use("/api/study-materials", studyMaterialsRouter);
 app.use("/api/agora", agoraRouter);
 
 app.use((err, _req, res, _next) => {

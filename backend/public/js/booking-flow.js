@@ -43,6 +43,7 @@
     },
   };
 
+  /** 与 `backend/data/studyMaterials.js` 中 PREVIEW_MARKDOWN 保持同步（供 PDF 生成） */
   var PREVIEW_MARKDOWN = {
     interview:
       "## Key vocabulary\n- **initiate** — 发起；开始\n- **candidate** — 候选人\n- **qualification** — 资质\n\n## Useful lines\n- I would like to elaborate on my experience in…\n- Could you tell me more about the team structure?\n",
@@ -361,13 +362,36 @@
 
   if (btnDownloadMd) {
     btnDownloadMd.addEventListener("click", function () {
-      var text = PREVIEW_MARKDOWN[themeKey] || PREVIEW_MARKDOWN.interview;
-      var blob = new Blob([text], { type: "text/markdown;charset=utf-8" });
-      var a = document.createElement("a");
-      a.href = URL.createObjectURL(blob);
-      a.download = meta.title.replace(/\s+/g, "_") + "_预习.md";
-      a.click();
-      URL.revokeObjectURL(a.href);
+      btnDownloadMd.disabled = true;
+      fetch("/api/study-materials/pdf?theme=" + encodeURIComponent(themeKey), { credentials: "include" })
+        .then(function (r) {
+          return r.blob().then(function (blob) {
+            return { ok: r.ok, status: r.status, blob: blob };
+          });
+        })
+        .then(function (x) {
+          if (!x.ok) {
+            return x.blob.text().then(function (txt) {
+              var msg = "下载失败（" + x.status + "）";
+              try {
+                var j = JSON.parse(txt);
+                if (j && j.message) msg = j.message;
+              } catch (_) {}
+              throw new Error(msg);
+            });
+          }
+          var a = document.createElement("a");
+          a.href = URL.createObjectURL(x.blob);
+          a.download = meta.title.replace(/\s+/g, "_") + "_预习资料.pdf";
+          a.click();
+          URL.revokeObjectURL(a.href);
+        })
+        .catch(function (e) {
+          showToast(e && e.message ? e.message : "预习资料下载失败，请稍后重试");
+        })
+        .then(function () {
+          btnDownloadMd.disabled = false;
+        });
     });
   }
 
