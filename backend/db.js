@@ -1,7 +1,10 @@
 const fs = require("fs");
 const path = require("path");
 const { Pool } = require("pg");
-const { generateShanghaiWeekendEightPmStarts } = require("./utils/weekendSlotRules");
+const {
+  generateShanghaiWeekendEightPmStarts,
+  toShanghaiNaiveSqlRange,
+} = require("./utils/weekendSlotRules");
 
 let pool;
 
@@ -60,35 +63,43 @@ async function migrateUsersPasswordColumn(p) {
   `);
 }
 
-async function seedDemoIfEmpty(p) {
-  const { rows: c1 } = await p.query("SELECT COUNT(*)::int AS c FROM timeslots");
-  if (c1[0].c > 0) return;
-
+async function seedThemesIfEmpty(p) {
   const { rows: tc } = await p.query("SELECT COUNT(*)::int AS c FROM themes");
-  if (tc[0].c === 0) {
-    await p.query(`INSERT INTO themes (name, description, difficulty_level, is_active) VALUES
+  if (tc[0].c > 0) return;
+  await p.query(`INSERT INTO themes (name, description, difficulty_level, is_active) VALUES
       ('职场面试', '模拟英文面试，讨论职业规划', 'intermediate', 1),
       ('雅思口语 Part 2', '随机抽取题库进行 2 分钟独白练习', 'intermediate', 1),
       ('日常闲聊', '轻松的话题，分享生活趣事', 'beginner', 1)`);
-  }
+}
 
+/** 每个活跃主题补全未来若干次「上海周六/日 20:00」场次（与 API 过滤一致；按 start_time 去重） */
+async function ensureWeekendTimeslots(p) {
   const { rows: themeRows } = await p.query("SELECT id FROM themes WHERE is_active = 1 ORDER BY id");
   if (themeRows.length === 0) return;
 
-  /** 每个主题若干次「上海周六/日 20:00」演示场次（空库时写入） */
-  const starts = generateShanghaiWeekendEightPmStarts(12, 56);
+  const starts = generateShanghaiWeekendEightPmStarts(16, 90);
   if (starts.length === 0) return;
 
   for (const row of themeRows) {
     const themeId = Number(row.id);
     for (const st of starts) {
-      const end = new Date(st.getTime() + 60 * 60 * 1000);
+      const { startSql, endSql } = toShanghaiNaiveSqlRange(st);
+      const { rows: dup } = await p.query(
+        `SELECT 1 FROM timeslots WHERE theme_id = $1 AND start_time = $2::timestamp LIMIT 1`,
+        [themeId, startSql]
+      );
+      if (dup.length > 0) continue;
       await p.query(
-        `INSERT INTO timeslots (theme_id, start_time, end_time, max_pairs, booked_count, status) VALUES ($1, $2, $3, 5, 0, 'open')`,
-        [themeId, st, end]
+        `INSERT INTO timeslots (theme_id, start_time, end_time, max_pairs, booked_count, status) VALUES ($1, $2::timestamp, $3::timestamp, 5, 0, 'open')`,
+        [themeId, startSql, endSql]
       );
     }
   }
+}
+
+async function seedDemoIfEmpty(p) {
+  await seedThemesIfEmpty(p);
+  await ensureWeekendTimeslots(p);
 }
 
 async function initDb() {

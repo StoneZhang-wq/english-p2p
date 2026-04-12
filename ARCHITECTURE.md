@@ -251,7 +251,7 @@ SMS_ACCESS_SECRET=
 ## 9. 脚本约定（待 package.json）
 
 - `npm run dev`：`nodemon` 启动 `backend/app.js`
-- 应用启动：执行 `schema.postgres.sql`（`CREATE IF NOT EXISTS`）
+- 应用启动：执行 `schema.postgres.sql`（`CREATE IF NOT EXISTS`）；`backend/db.js` 的 `initDb` 在主题表为空时写入演示主题，并**每次**调用 `ensureWeekendTimeslots`：为每个活跃主题按 `backend/utils/weekendSlotRules.js` 补全未来若干次「上海周六/日 20:00」`timeslots` 行（`start_time`/`end_time` 为上海墙上时钟的 naive `timestamp`，插入前按 `theme_id` + `start_time` 去重）。
 - 生产：`pm2 start backend/app.js --name english-match`
 
 ---
