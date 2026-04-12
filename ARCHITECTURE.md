@@ -7,7 +7,7 @@
 ## 1. 项目概述
 
 - **形态**：移动端网页优先（手机浏览器），用户通过**预约主题 + 时间段 + 口语水平**参与**角色扮演式**英语对话。
-- **核心流程**：登录 → 浏览主题/场次 → **预约（受截止规则限制）** → **尽早配对 + 通知** → **个人中心/接口展示具体搭档（昵称、水平）** → **停配扫描 / 开场落单互配（若需要）** → 进入房间 → Agora 实时语音 → 结束并更新信用分。
+- **核心流程**：登录 → 浏览主题/场次 → **预约（受截止规则限制）** → **预约后即可进等待大厅（RTC）** → **开场到点后首轮自动配对 + 通知** → **个人中心/接口展示具体搭档（昵称、水平）** → **停配扫描 / 开场落单互配（若需要）** → Agora 实时语音（配对后切 1v1 频道） → 结束并更新信用分。
 - **地域**：现阶段大陆用户（时区 `Asia/Shanghai`）。
 
 ---
@@ -167,13 +167,14 @@ CREATE TABLE credit_logs (
 | GET | `/api/my-pair` | Query：`timeslot_id`；返回 **channel_name、agora_app_id、agora_token（可选）、搭档昵称、搭档水平、双方任务卡/角色** |
 | POST | `/api/end-conversation` | Body：`pair_id`, `duration_seconds` 等；用于结算与信用分 |
 | GET | `/api/user/profile` | 昵称、信用分等 |
-| POST | `/api/agora/rtc-token` | Body：`{ channelName, uid }`；返回 `appId`、`channelName`、`token`、`uid`、`expiresIn`。**须开启声网 App Certificate**，Token 仅服务端生成；生产环境须叠加登录态与「用户属于该频道对应 pair」校验（当前为集成骨架） |
+| POST | `/api/agora/rtc-token` | Body：`{ channelName, uid }`；返回 `appId`、`channelName`、`token`、`uid`、`expiresIn`。**须开启声网 App Certificate**；**演示/联调用**，不校验预约（与 `rtc-token-booking` 区分） |
+| POST | `/api/agora/rtc-token-booking` | **须登录**。Body：`{ timeslot_id }`；校验当前用户在该场次有 `confirmed` 预约；若已存在包含本人的 `pairs` 则返回该 **1v1** `channel_name`，否则返回**同场等待大厅**频道名 `engw{timeslotId}`（`utils/agoraChannelNames.js`）；`uid` 取用户 id（须满足声网 uint32） |
 
 **开发调试（非正式配对）**：当 `NODE_ENV !== 'production'` **或** `ENABLE_DEV_PAIRING=1` 时挂载 `routes/devPairing.js`（否则不注册该路径）：
 
 | 方法 | 路径 | 说明 |
 |------|------|------|
-| POST | `/api/dev/pair-timeslot` | Body：`{ timeslot_id }`（整数）。**须登录**；调用者须在该场次有 `confirmed` 预约，且存在另一名同场次预约者与其**口语等级差≤1**（`utils/levelCompatibility.js`）；事务内 **删除该场次全部 `pairs`** 后 **INSERT** 一行（`channel_name` 形如 `dev_eng_{timeslotId}_{ts}`，满足声网频道字符集）。**禁止**在生产长期开启 `ENABLE_DEV_PAIRING`；正式「尽早配对」仍须独立实现。 |
+| POST | `/api/dev/pair-timeslot` | Body：`{ timeslot_id }`（整数）。**须登录**；调用者须在该场次有 `confirmed` 预约，且存在另一名同场次预约者与其**口语等级差≤1**（`utils/levelCompatibility.js`）；事务内 **删除该场次全部 `pairs`** 后 **INSERT** 一行（`channel_name` 形如 `dev_eng_{timeslotId}_{ts}`，满足声网频道字符集）。**禁止**在生产长期开启 `ENABLE_DEV_PAIRING`；用于**早于开场**强制造 `pairs` 的调试，与正常「开场后 `runAutoPairingScan`」不同。 |
 
 ### 5.3 预约截止（强制）
 
@@ -183,7 +184,7 @@ CREATE TABLE credit_logs (
 
 ### 5.4 配对结果与「具体对象是谁」
 
-- 配对策略以 `docs/产品描述.md` **第 5.3、9 节**为准：**尽早配对**、**取消触发的重配**、**开场前 60 分钟停约停首次配对**、**停配时刻全员可配性检查**、**开场落单互配**。
+- 配对策略以 `docs/产品描述.md` **第 5.3、9 节**为准：**开场到点后首轮自动配对**、**取消触发的重配**、**开场前 60 分钟停新约**、**停配时刻全员可配性检查**、**开场落单互配**（后三项在代码中部分仍为待办）。
 - 每次 `pairs` 写入或变更后：
   - **通知**（邮件/短信/Push）须覆盖产品第 10 节所列关键事件（首次成对、重配、场次取消、新搭档分配等）。
   - **个人中心 / 预约详情**与 **`GET /api/bookings/mine`**（及未来的 **`GET /api/my-pair`**）必须在数据层带出**当前用户对应的那一位搭档**的 `nickname` + `level`（实现上通过 `user_a`/`user_b` 与当前用户 id 判断对方用户行）；**频道名**仅服务端生成。
@@ -198,15 +199,15 @@ CREATE TABLE credit_logs (
 - 使用**数据库事务**；更新 `timeslots.booked_count` 前用 **`SELECT ... FOR UPDATE`**（或等价行锁）锁定场次行。
 - 条件：`booked_count < max_pairs * 2` 方可新增一条 `confirmed` 预约。
 
-### 6.2 配对算法（持续 + 停配 + 开场）
+### 6.2 配对算法（开场首轮 + 停配 + 开场）
 
-- **输入**：同一 `timeslot_id`（及同一主题）下 `status='confirmed'` 的 `bookings`（含 `level`）；以及开场签到窗口内识别出的**落单池**用户集合（用于二次配对）。
-- **输出**：创建/更新/解除 `pairs` 行；`channel_name` 建议格式：`eng_{timeslot_id}_{pair_id}_{timestamp}`（仅服务端生成；**重配时须换新频道标识**以免串线）。
-- **约束**（与 `docs/产品描述.md` 第 9 节一致）：两人等级差 **≤ 1**；**优化目标**：最大化成对人数、最小化落单人数。实现方式不限（图匹配、ILP、增量匹配等）。
-- **触发时机**（须拆服务或统一调度器，实现不限定）：
-  1. **预约成功 / 取消 / 停配前轮询**：任意导致预约集合变化的事件后尝试配对或拆对重配。
-  2. **停配时刻**（`start_time - 60min`，`Asia/Shanghai`）：停止新的**首次**配对；扫描是否全员可合法成对；否则执行第 7 节兜底。
-  3. **开场到点**：根据「已上线 / 未上线」判定，对落单用户在同场次内执行**二次配对**并通知。
+- **输入**：同一 `timeslot_id`（及同一主题）下 `status='confirmed'` 的 `bookings`（含 `level`）；以及开场签到窗口内识别出的**落单池**用户集合（用于二次配对，**待实现**）。
+- **输出**：创建/更新/解除 `pairs` 行；`channel_name` 建议格式：`engp{timeslot_id}_{timestamp}`（仅服务端生成；**重配时须换新频道标识**以免串线）。
+- **约束**（与 `docs/产品描述.md` 第 9 节一致）：两人等级差 **≤ 1**；**优化目标**：最大化成对人数、最小化落单人数。当前 MVP 为**贪心**逐对写入（`services/autoPairingAtSlot.js`），非全局最优图匹配。
+- **触发时机**（当前仓库）：
+  1. **开场到点后**：`app.js` 每 **60 秒**调用 `runAutoPairingScan`：对「`now ∈ [start_time, end_time)`（上海 naive 解析）」且 `open` 的场次，在事务内对**尚未出现在任何 `pairs` 行中**的预约用户做贪心相容配对并 `INSERT pairs`。**不在** `POST /api/bookings` 成功路径上立即配对。
+  2. **停配时刻**（`start_time - 60min`）：全员可配性扫描与兜底（第 7 节）**仍待实现**。
+  3. **开场到点落单互配**：**仍待实现**（依赖签到/上线判定）。
 - **兜底**：停配扫描仍无法全员合法成对时，按产品描述执行**场次取消 + 全员通知 + 信用补偿 + 优先预约权**，且不扣用户分。
 - **「已上线」判定**（须文档化并在接口中体现）：例如进房页心跳、`joinChannel` 成功回调、或显式签到 API；具体字段在实现阶段补充至本文与 OpenAPI/README。
 
@@ -218,15 +219,16 @@ CREATE TABLE credit_logs (
 ### 6.4 房间与 Agora
 
 - **Web SDK**：使用 **4.x**（如 `agora-rtc-sdk-ng@4.23.x` CDN：`AgoraRTC_N-production.js`）。
-- **Token**：**必须**启用控制台 **App Certificate**，通过 `POST /api/agora/rtc-token` 获取 Token 后 `createClient` → `join(appId, channel, token, uid)` → `createMicrophoneAudioTrack` → `publish`；集成时可调用 `enableLogUpload` 便于排障。
-- 前端仅使用接口返回的 `channel_name` / token / appId；**禁止**前端自拟频道名（演示页可通过 Query 传 `channel`、`uid`，上线后改为 `GET /api/my-pair` 下发）。
+- **Token**：**必须**启用控制台 **App Certificate**。正式预约进房使用 `POST /api/agora/rtc-token-booking`（`timeslot_id`）；演示联调仍可用 `POST /api/agora/rtc-token`（`channelName` + `uid`）。流程：`createClient` → `join` → `createMicrophoneAudioTrack` → `publish`；可调用 `enableLogUpload` 便于排障。
+- 前端仅使用接口返回的 `channelName` / token / appId；**禁止**前端自拟频道名（`room.html?timeslot_id=` 为预约路径；`?channel=&uid=` 为演示路径）。
 - iOS 非 Safari 麦克风限制：房间页**顶部红色提示**建议使用 Safari 或 Chrome。
 
 ### 6.5 定时任务（Cron）与事件
 
-- **配对与停配**：建议**每 1 分钟**（或更短）扫描：距 `start_time` 已进入「可预约窗口内」的场次，对未配对集合执行增量配对；对 **`start_time - 60min`** 已过的场次执行停配扫描与第 7 节检查。
-- **开场落单互配**：在 `start_time`（或签到截止）到达时触发任务，读取签到状态，更新 `pairs` 并发送通知。
-- **事件驱动**：`POST /api/bookings` 成功、`DELETE /api/cancel-booking/:id` 等路径**须入队或同步调用**配对尝试，以满足「尽早配对」与「取消后重配」（配对服务落地后接上）。
+- **开场首轮配对**：已实现 **每 60 秒** `runAutoPairingScan`（见 6.2），仅对**已开始且未结束**的场次写入 `pairs`。
+- **停配扫描**：对 **`start_time - 60min`** 已过的场次做全员可配性检查与第 7 节兜底 — **仍待实现**。
+- **开场落单互配**：在 `start_time`（或签到截止）到达时触发任务，读取签到状态，更新 `pairs` 并发送通知 — **仍待实现**。
+- **事件驱动（可选增强）**：`DELETE /api/cancel-booking/:id` 后可在同场次立即尝试重配；当前主要依赖下一轮分钟扫描。
 - 时区：**Asia/Shanghai**。
 
 ### 6.6 周主题的「当前开放周」（`weekThemeCycle.js`）
@@ -288,13 +290,13 @@ SMS_ACCESS_SECRET=
 | 数据隔离 | `bookings` 查询已带 `WHERE b.user_id = $1`；新增接口须沿用「从会话取 user_id，禁止信任客户端传来的 owner id」 |
 | 预约 | `POST /api/bookings` + `services/bookTransaction.js`：事务 + `FOR UPDATE` 防超卖 |
 | 预约截止 60 分钟 | **未做**：`bookTransaction` / `timeslots` 路由未按 `Asia/Shanghai` 与 `start_time` 拦截 |
-| 配对（尽早 / 取消重配 / 停配 / 开场互配） | **未做**：无 `cron/` 与事件驱动配对、`pairs` 写入与通知发送 |
+| 配对（开场首轮 / 取消重配 / 停配 / 开场互配） | **部分**：`runAutoPairingScan` 开场窗口内贪心写 `pairs`；**通知、停配扫描、落单互配**仍待实现 |
 | 我的预约 | `GET /api/bookings/mine`：含 `LEFT JOIN pairs` 展示搭档昵称等（若库中已有配对行） |
-| Agora | `POST /api/agora/rtc-token`：需 `AGORA_APP_CERTIFICATE`；**须补**登录用户与 `channel_name` 所属 `pairs` 的校验（见 `routes/agora.js` 注释） |
-| 房间页 | `public/room.html`、`js/room-agora.js`、`js/room-tasks.js`、`services/roomTaskWs.js` |
+| Agora | `POST /api/agora/rtc-token-booking`：需登录 + 预约校验；`POST /api/agora/rtc-token` 仍为演示；生产可收紧 rtc-token |
+| 房间页 | `public/room.html`、`js/room-agora.js`（`timeslot_id` 轮询切频道）、`js/room-tasks.js`、`services/roomTaskWs.js` |
 | 信用分结算 | `credit_logs` 表已建；**无** `POST /api/end-conversation` 等与产品一致的结算链路 |
 
-**与外部「全栈方案讨论」的差异**：本仓库前端为 **原生 JS**（非 React/Vue 必选）；配对策略以 **`docs/产品描述.md` 第 5.3、9 节** 为准（尽早配对 + 停配 + 开场互配，非单一「开场前 5 分钟批处理」）；主题 **MVP 为固定集**（非 AI 自动生成档期）。若产品决策变更，先改 `docs/产品描述.md` 再改实现。
+**与外部「全栈方案讨论」的差异**：本仓库前端为 **原生 JS**（非 React/Vue 必选）；配对策略以 **`docs/产品描述.md` 第 5.3、9 节** 为准（**开场到点后首轮配对** + 停配 + 开场互配）；主题 **MVP 为固定集**（非 AI 自动生成档期）。若产品决策变更，先改 `docs/产品描述.md` 再改实现。
 
 ---
 

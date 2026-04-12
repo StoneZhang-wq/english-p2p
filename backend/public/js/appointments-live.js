@@ -103,18 +103,10 @@
         : "搭档：配对完成后显示";
 
     var enter = "";
-    if (!past && myUid != null) {
-      if (b.channelName) {
-        var href =
-          "room.html?channel=" +
-          encodeURIComponent(b.channelName) +
-          "&uid=" +
-          encodeURIComponent(String(myUid));
-        enter = '<a class="btn-enter" href="' + href + '">进入房间</a>';
-      } else {
-        enter =
-          '<button type="button" class="btn-enter btn-enter--disabled" disabled aria-disabled="true" title="配对完成后可进入">进入房间</button>';
-      }
+    if (!past && myUid != null && b.timeslotId != null) {
+      var href =
+        "room.html?timeslot_id=" + encodeURIComponent(String(b.timeslotId));
+      enter = '<a class="btn-enter" href="' + href + '">进入房间</a>';
     }
 
     var cancelBlock = "";

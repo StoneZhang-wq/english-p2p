@@ -34,13 +34,14 @@ npm run dev
 | GET | `/api/themes` | 当前周三个主题（周日 19:00 上海起开放下一周） |
 | GET | `/api/timeslots?theme_id=1` | **`theme_id` 必填**（数字 id，来自 `/api/themes`） |
 | POST | `/api/bookings` | 需登录；Body `{ timeslot_id, level }`，`level`：`beginner` / `mid` / `adv` 或 `intermediate` 等 |
-| GET | `/api/bookings/mine` | 需登录；返回预约列表及搭档、`channel_name`（配对后） |
+| GET | `/api/bookings/mine` | 需登录；返回预约列表及搭档、`channel_name`（`pairs` 写入后） |
+| POST | `/api/agora/rtc-token-booking` | 需登录；Body `{ timeslot_id }`；有预约则下发等待大厅或 1v1 频道 Token（见 `ARCHITECTURE.md`） |
 
 预约写入使用 **事务 + `SELECT … FOR UPDATE`** 锁定场次行，校验 `status = 'open'` 与 `booked_count < max_pairs * 2`，防止超卖。
 
-启动与定时任务会按**周主题轮换规则**补全 `themes` / `timeslots`（见 `ARCHITECTURE.md`）。
+启动与定时任务会按**周主题轮换规则**补全 `themes` / `timeslots`（见 `ARCHITECTURE.md`）。**开场到点后**：`runAutoPairingScan` 每分钟为「已开始且未结束」的场次写入 `pairs`（贪心、等级差≤1）。
 
-**尚未实现**（按 `ARCHITECTURE.md` 后续迭代）：开场前 cron **自动**配对、邮件通知、**`POST /api/agora/rtc-token` 与登录态及 pair 绑定校验**（当前仍为演示级 Token）。配对可用一般图最大匹配（等级差≤1）在 `O(n³)` 内完成。
+**尚未实现**（按 `ARCHITECTURE.md` 后续迭代）：停配全员扫描、邮件通知、落单互配、**`POST /api/agora/rtc-token` 收紧**（当前仍为演示级）。配对算法可升级为图最大匹配（等级差≤1）等。
 
 ### 开发调试：一键写入 `pairs`（两名用户已约同一场）
 
@@ -62,8 +63,8 @@ fetch("/api/dev/pair-timeslot", {
 ### 声网联调（免预约）
 
 部署后可直接打开 **`/agora-test.html`**，按页内两个链接用 **不同 uid** 进同一频道；或手动访问  
-`room.html?channel=cloud-dev&uid=10001` 与 `room.html?channel=cloud-dev&uid=10002`。  
-**无需**先预约。上线前请为 `rtc-token` 增加鉴权与 pair 校验。
+`room.html?channel=cloud-dev&uid=10001` 与 `room.html?channel=cloud-dev&uid=10002`（走 **`/api/agora/rtc-token`**，**无需**登录）。  
+**正式预约进房**：登录后打开 `room.html?timeslot_id=<数字>`，走 **`/api/agora/rtc-token-booking`**。
 
 ## 推送到 GitHub（首次）
 

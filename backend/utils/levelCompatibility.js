@@ -34,4 +34,26 @@ function findCompatiblePairIncludingCaller(bookings, callerUserId) {
   return null;
 }
 
-module.exports = { LEVEL_ORDER, levelDistance, levelsCompatible, findCompatiblePairIncludingCaller };
+/**
+ * 从预约列表中找第一对等级相容的用户（用于开场后贪心多对配对）。
+ * @param {{ user_id: number, level: string }[]} bookings
+ * @returns {[typeof bookings[0], typeof bookings[0]] | null}
+ */
+function findFirstCompatiblePairInBookings(bookings) {
+  for (let i = 0; i < bookings.length; i += 1) {
+    for (let j = i + 1; j < bookings.length; j += 1) {
+      if (levelsCompatible(bookings[i].level, bookings[j].level)) {
+        return [bookings[i], bookings[j]];
+      }
+    }
+  }
+  return null;
+}
+
+module.exports = {
+  LEVEL_ORDER,
+  levelDistance,
+  levelsCompatible,
+  findCompatiblePairIncludingCaller,
+  findFirstCompatiblePairInBookings,
+};

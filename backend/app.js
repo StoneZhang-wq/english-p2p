@@ -4,7 +4,8 @@ const cors = require("cors");
 const cookieParser = require("cookie-parser");
 const path = require("path");
 const fs = require("fs");
-const { initDb, runWeeklyThemeMaintenance } = require("./db");
+const { initDb, runWeeklyThemeMaintenance, getPool } = require("./db");
+const { runAutoPairingScan } = require("./services/autoPairingAtSlot");
 const authRouter = require("./routes/auth");
 const timeslotsRouter = require("./routes/timeslots");
 const bookingsRouter = require("./routes/bookings");
@@ -85,6 +86,15 @@ initDb()
         console.error("[weekly-theme]", e && e.message ? e.message : e);
       });
     }, 10 * 60 * 1000);
+
+    setInterval(function () {
+      runAutoPairingScan(getPool()).catch(function (e) {
+        console.error("[auto-pair]", e && e.message ? e.message : e);
+      });
+    }, 60 * 1000);
+    runAutoPairingScan(getPool()).catch(function (e) {
+      console.error("[auto-pair]", e && e.message ? e.message : e);
+    });
 
     const server = app.listen(PORT);
     attachRoomTaskWebSocket(server);
