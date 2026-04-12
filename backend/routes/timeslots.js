@@ -37,7 +37,10 @@ router.get("/", async (req, res) => {
     }
 
     const { rows } = await pool.query(
-      `SELECT id, theme_id, start_time, end_time, max_pairs, booked_count, status,
+      `SELECT id, theme_id,
+        to_char(start_time, 'YYYY-MM-DD HH24:MI:SS') AS start_time,
+        to_char(end_time, 'YYYY-MM-DD HH24:MI:SS') AS end_time,
+        max_pairs, booked_count, status,
         (max_pairs * 2 - booked_count) AS spots_left
        FROM timeslots
        WHERE theme_id = $1 AND status = 'open'

@@ -29,7 +29,17 @@ const SHANGHAI_HOUR = new Intl.DateTimeFormat("en-US", {
  */
 function toDateForShanghaiRule(startLike) {
   if (startLike instanceof Date) {
-    return Number.isNaN(startLike.getTime()) ? null : startLike;
+    if (Number.isNaN(startLike.getTime())) return null;
+    // PG `timestamp without time zone` → node-pg 在 **UTC** 进程里会把「库里的墙上数字」当成 UTC 的日历时刻，
+    // 不能直接当「上海时刻」用 Intl 去 format。这里用本地历的 ymdHMS 再按 +08 解析为上海墙上时钟。
+    const pad = (n) => String(n).padStart(2, "0");
+    const y = startLike.getFullYear();
+    const m = pad(startLike.getMonth() + 1);
+    const day = pad(startLike.getDate());
+    const h = pad(startLike.getHours());
+    const min = pad(startLike.getMinutes());
+    const sec = pad(startLike.getSeconds());
+    return new Date(`${y}-${m}-${day}T${h}:${min}:${sec}+08:00`);
   }
   const s = String(startLike).trim();
   if (!s) return null;

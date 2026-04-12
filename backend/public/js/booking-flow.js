@@ -114,7 +114,15 @@
 
   function parseDbTime(s) {
     if (!s) return null;
-    var d = new Date(String(s).replace(" ", "T"));
+    var str = String(s).trim();
+    // 无时区偏移的「上海场次」墙上时间（与后端 to_char / 规则一致），勿用浏览器本地时区误解析
+    if (/^\d{4}-\d{2}-\d{2}[T ]\d{2}:\d{2}/.test(str) && !/[zZ]$/.test(str) && !/[+-]\d{2}:?\d{2}$/.test(str)) {
+      var iso = str.replace(" ", "T");
+      if (/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}$/.test(iso)) iso += ":00";
+      var d0 = new Date(iso + "+08:00");
+      return Number.isNaN(d0.getTime()) ? null : d0;
+    }
+    var d = new Date(str.replace(" ", "T"));
     return Number.isNaN(d.getTime()) ? null : d;
   }
 

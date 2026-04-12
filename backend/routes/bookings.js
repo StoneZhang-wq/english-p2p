@@ -48,7 +48,9 @@ router.get("/mine", requireAuth, async (req, res) => {
 
     const { rows } = await pool.query(
       `SELECT b.id, b.timeslot_id, b.level, b.status AS booking_status, b.created_at,
-        t.start_time, t.end_time, t.status AS slot_status, t.booked_count, t.max_pairs,
+        to_char(t.start_time, 'YYYY-MM-DD HH24:MI:SS') AS start_time,
+        to_char(t.end_time, 'YYYY-MM-DD HH24:MI:SS') AS end_time,
+        t.status AS slot_status, t.booked_count, t.max_pairs,
         th.name AS theme_name,
         CASE WHEN p.user_a = $1 THEN ub.nickname WHEN p.user_b = $1 THEN ua.nickname END AS partner_nickname,
         CASE WHEN p.user_a = $1 THEN ub.credit_score WHEN p.user_b = $1 THEN ua.credit_score END AS partner_credit_score,

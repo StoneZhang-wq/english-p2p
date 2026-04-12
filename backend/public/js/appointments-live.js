@@ -28,20 +28,38 @@
     return d.innerHTML;
   }
 
+  var SHANGHAI_TZ = "Asia/Shanghai";
+
   function parseDbTime(s) {
     if (!s) return null;
-    var d = new Date(String(s).replace(" ", "T"));
+    var str = String(s).trim();
+    if (/^\d{4}-\d{2}-\d{2}[T ]\d{2}:\d{2}/.test(str) && !/[zZ]$/.test(str) && !/[+-]\d{2}:?\d{2}$/.test(str)) {
+      var iso = str.replace(" ", "T");
+      if (/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}$/.test(iso)) iso += ":00";
+      var d0 = new Date(iso + "+08:00");
+      return Number.isNaN(d0.getTime()) ? null : d0;
+    }
+    var d = new Date(str.replace(" ", "T"));
     return Number.isNaN(d.getTime()) ? null : d;
   }
 
   function formatTime(iso) {
     if (!iso) return "—";
     var d = parseDbTime(iso);
-    if (!d) return iso;
-    function p2(n) {
-      return n < 10 ? "0" + n : String(n);
-    }
-    return d.getFullYear() + "-" + p2(d.getMonth() + 1) + "-" + p2(d.getDate()) + " " + p2(d.getHours()) + ":" + p2(d.getMinutes());
+    if (!d) return String(iso);
+    var ymd = new Intl.DateTimeFormat("en-CA", {
+      timeZone: SHANGHAI_TZ,
+      year: "numeric",
+      month: "2-digit",
+      day: "2-digit",
+    }).format(d);
+    var hm = new Intl.DateTimeFormat("en-US", {
+      timeZone: SHANGHAI_TZ,
+      hour: "2-digit",
+      minute: "2-digit",
+      hour12: false,
+    }).format(d);
+    return ymd + " " + hm;
   }
 
   function isPastBooking(b) {

@@ -157,7 +157,7 @@ CREATE TABLE credit_logs (
 | POST | `/api/send-code` | 发送验证码（手机号或邮箱） |
 | POST | `/api/login` | 验证码登录，返回会话 Token |
 | GET | `/api/themes` | 主题列表 |
-| GET | `/api/timeslots` | Query：`theme_id`，可选 `theme`；仅返回 **北京时间周六、日 20:00 开场** 的 `open` 场次（`backend/utils/weekendSlotRules.js` 过滤）；前端展示 **MM-DD HH:mm** 与 **星期** |
+| GET | `/api/timeslots` | Query：`theme_id`，可选 `theme`；仅返回 **北京时间周六、日 20:00 开场** 的 `open` 场次（`weekendSlotRules.js` 过滤）。库内为 `timestamp without time zone`（上海墙上时钟）；查询用 `to_char` 取字符串再过滤，避免 **Node 默认 UTC** 下 `Date` 误解析导致列表被滤空 |
 | POST | `/api/book` | Body：`timeslot_id`, `level`；**受预约截止与容量约束** |
 | GET | `/api/my-bookings` | 当前用户预约列表；**若已配对**，每条含 **搭档昵称 `partner_nickname`、搭档水平 `partner_level`**（不对用户暴露对方手机号） |
 | DELETE | `/api/cancel-booking/:id` | 取消预约（需校验归属与业务允许取消的时间窗，产品未定时可默认开场前均可取消，**截止预约不影响已确认预约的主动取消**，除非产品另定） |
