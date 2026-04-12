@@ -57,7 +57,7 @@
 
 **强制规则（产品）**：
 
-- **开放时段**：每主题仅 **北京时间周六、日 20:00** 开场（列表须含**具体日期**与**星期**）；`GET /api/timeslots` 已按此过滤；后端在 `initDb` 时按同一规则为活跃主题**补全未来若干周**合规场次（避免列表被历史脏数据滤空）。  
+- **周主题轮换**：**每周日 19:00（北京时间）起**开放**下一自然周**的 **3 个**练习主题；每个主题仅在该周有效，至该周**周日最后一场**结束后由服务端轮换为下周三主题。首页 `GET /api/themes`，预约页 `booking.html?theme_id=`。场次仍为每主题**该周周六、日 20:00**（`GET /api/timeslots?theme_id=` 过滤展示）。  
 - 距场次开始 **不足 60 分钟**：**停止接受新预约**，并**停止对尚未首次配对的用户做新的首次配对**；列表须显示不可约原因；**已确认预约不因此自动取消**（除非产品另定）。  
 - **同一用户不可重复预约同一时间段**；可有多个不同场次的未开始预约。  
 - **预约页主文案（可缩为一句）**：  
@@ -155,7 +155,9 @@
 | POST | `/api/auth/login` | Body: `email`, `password` |
 | POST | `/api/auth/logout` | 清除会话 |
 | GET | `/api/auth/me` | 当前用户；未登录返回 401 |
-| GET | `/api/timeslots` | Query: **`theme_id`** 或 **`theme`**（`interview` / `ielts` / `chat` 映射到库内主题名） |
+| GET | `/api/themes` | 当前开放周期内三个主题（含 `id`、封面、场景、角色 JSON 等） |
+| GET | `/api/themes/by-id` | Query: **`id`**=`theme_id`，预约页展示用 |
+| GET | `/api/timeslots` | Query: **`theme_id`（必填）** |
 | POST | `/api/bookings` | Body: `timeslot_id`, `level`（`beginner` \| `intermediate` \| `advanced`） |
 | GET | `/api/bookings/mine` | 我的预约列表；含 `partnerNickname`、`channelName`、`pairStatus` 等（配对存在时） |
 | POST | `/api/agora/rtc-token` | Body: `channelName`, `uid`；返回声网入会信息 |
@@ -189,7 +191,7 @@
 1. 布局壳 + 底栏导航 + 全局字体/色板。  
 2. 登录 / 注册 / `me` 拉信用分。  
 3. 首页主题列表（可先写死或接 DB 扩展）。  
-4. 预约页：`timeslots` → 选档 → `POST /bookings`。  
+4. 预约页：`GET /api/themes/by-id` 渲染头图与场景 → `timeslots?theme_id=` 选档 → `POST /bookings`。  
 5. 我的预约：`GET /bookings/mine` + 状态文案 + 进房按钮（无 `channelName` 时禁用或提示「待配对」）。  
 6. 房间页：展示 + `rtc-token` + 加入频道 + 麦克风（可选摄像头）+ iOS 横幅。  
 7. 结束双确认、信用分展示（待后端接口落地后对接）。

@@ -4,33 +4,16 @@ const { isShanghaiSaturdayOrSundayEightPm } = require("../utils/weekendSlotRules
 
 const router = express.Router();
 
-const THEME_PARAM_TO_NAME = {
-  interview: "职场面试",
-  ielts: "雅思口语 Part 2",
-  chat: "日常闲聊",
-};
-
 router.get("/", async (req, res) => {
   try {
     const pool = getPool();
-    let themeId = Number(req.query.theme_id);
-    const themeParam = String(req.query.theme || "").trim();
-
-    if ((!themeId || Number.isNaN(themeId)) && themeParam) {
-      const name = THEME_PARAM_TO_NAME[themeParam];
-      if (name) {
-        const { rows } = await pool.query("SELECT id FROM themes WHERE name = $1 AND is_active = 1", [name]);
-        if (rows[0]) themeId = rows[0].id;
-      }
-    }
+    const themeId = Number(req.query.theme_id);
 
     if (!themeId || Number.isNaN(themeId)) {
-      return res.status(400).json({ code: 400, message: "缺少或无效 theme / theme_id", data: null });
+      return res.status(400).json({ code: 400, message: "缺少或无效 theme_id", data: null });
     }
 
-    const { rows: themeRows } = await pool.query("SELECT id, name FROM themes WHERE id = $1 AND is_active = 1", [
-      themeId,
-    ]);
+    const { rows: themeRows } = await pool.query("SELECT id, name FROM themes WHERE id = $1", [themeId]);
     const theme = themeRows[0];
     if (!theme) {
       return res.status(404).json({ code: 404, message: "主题不存在", data: null });

@@ -38,8 +38,8 @@ project-root/
 │   ├── controllers/      # 业务逻辑
 │   ├── models/           # 数据访问（PostgreSQL / pg）
 │   ├── services/         # 邮件、短信、Agora Token、**预习 docx 生成**（`buildPreviewMaterialDocx.js`）等
-│   ├── data/             # 静态配置（如 `previewMaterials.js` 与各主题 Markdown 正文，供 docx 与前端预览同步）
-│   ├── utils/            # 验证码、配对算法、**周末场次规则**（`weekendSlotRules.js`）等
+│   ├── data/             # 静态配置（如 `themeRotationPool.js` 周主题轮换池）
+│   ├── utils/            # 验证码、配对算法、**周末场次规则**（`weekendSlotRules.js`）、**周主题周期**（`weekThemeCycle.js`）等
 │   ├── cron/             # 定时任务（配对、停配扫描、开场互配等）
 │   ├── public/           # 前端静态页（HTML/CSS/JS，express.static）
 │   └── app.js            # Express 入口
@@ -158,8 +158,10 @@ CREATE TABLE credit_logs (
 | POST | `/api/send-code` | 发送验证码（手机号或邮箱） |
 | POST | `/api/login` | 验证码登录，返回会话 Token |
 | GET | `/api/themes` | 主题列表 |
-| GET | `/api/timeslots` | Query：`theme_id`，可选 `theme`；仅返回 **北京时间周六、日 20:00 开场** 的 `open` 场次（`weekendSlotRules.js` 过滤）。库内为 `timestamp without time zone`（上海墙上时钟）；查询用 `to_char` 取字符串再过滤，避免 **Node 默认 UTC** 下 `Date` 误解析导致列表被滤空 |
-| GET | `/api/preview-material/docx` | Query：`theme`=`interview` \| `ielts` \| `chat`；**须登录**（Cookie）；返回 **Word `.docx`**（`docx` + `data/previewMaterials.js`） |
+| GET | `/api/themes` | 当前开放周期内**三个**周主题（见 `weekThemeCycle.js`）；未到周日 19:00（上海）则 `themes` 为空并带说明文案 |
+| GET | `/api/themes/by-id` | Query：`id`=`theme_id`；预约页拉取展示字段（含 `preview_markdown`、已归档亦可读） |
+| GET | `/api/timeslots` | Query：**`theme_id`（必填）**；仅返回 **北京时间周六、日 20:00 开场** 的 `open` 场次（`weekendSlotRules.js` 过滤）。库内 `timestamp without time zone`；`to_char` 读出字符串再过滤，避免 UTC 下 `Date` 误判 |
+| GET | `/api/preview-material/docx` | Query：`theme_id`；**须登录**；正文来自 `themes.preview_markdown`，`docx` 包生成 |
 | POST | `/api/book` | Body：`timeslot_id`, `level`；**受预约截止与容量约束** |
 | GET | `/api/my-bookings` | 当前用户预约列表；**若已配对**，每条含 **搭档昵称 `partner_nickname`、搭档水平 `partner_level`**（不对用户暴露对方手机号） |
 | DELETE | `/api/cancel-booking/:id` | 取消预约（需校验归属与业务允许取消的时间窗，产品未定时可默认开场前均可取消，**截止预约不影响已确认预约的主动取消**，除非产品另定） |
@@ -253,7 +255,7 @@ SMS_ACCESS_SECRET=
 ## 9. 脚本约定（待 package.json）
 
 - `npm run dev`：`nodemon` 启动 `backend/app.js`
-- 应用启动：执行 `schema.postgres.sql`（`CREATE IF NOT EXISTS`）；`backend/db.js` 的 `initDb` 在主题表为空时写入演示主题，并**每次**调用 `ensureWeekendTimeslots`：为每个活跃主题按 `backend/utils/weekendSlotRules.js` 补全未来若干次「上海周六/日 20:00」`timeslots` 行（`start_time`/`end_time` 为上海墙上时钟的 naive `timestamp`，插入前按 `theme_id` + `start_time` 去重）。
+- 应用启动：执行 `schema.postgres.sql`（`CREATE IF NOT EXISTS`）；`backend/db.js` 的 `initDb` 迁移 `themes` 周字段后，将无 `shanghai_week_monday` 的旧主题置为下架，再 **归档过期周** 并 **`ensureWeeklyThemeCycle`**：按 `weekThemeCycle.js` + `themeRotationPool.js` 写入**当前应开放**自然周的三个主题及该周周六/日 20:00 场次。进程内每 **10 分钟** 调用 `runWeeklyThemeMaintenance()` 以在周日晚自动轮换，无需仅依赖重启。
 - 生产：`pm2 start backend/app.js --name english-match`
 
 ---

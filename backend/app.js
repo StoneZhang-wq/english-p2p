@@ -4,12 +4,13 @@ const cors = require("cors");
 const cookieParser = require("cookie-parser");
 const path = require("path");
 const fs = require("fs");
-const { initDb } = require("./db");
+const { initDb, runWeeklyThemeMaintenance } = require("./db");
 const authRouter = require("./routes/auth");
 const timeslotsRouter = require("./routes/timeslots");
 const bookingsRouter = require("./routes/bookings");
 const agoraRouter = require("./routes/agora");
 const previewMaterialRouter = require("./routes/previewMaterial");
+const themesRouter = require("./routes/themes");
 const { attachRoomTaskWebSocket } = require("./services/roomTaskWs");
 
 const app = express();
@@ -48,6 +49,7 @@ app.use("/api/timeslots", timeslotsRouter);
 app.use("/api/bookings", bookingsRouter);
 app.use("/api/agora", agoraRouter);
 app.use("/api/preview-material", previewMaterialRouter);
+app.use("/api/themes", themesRouter);
 
 app.use((err, _req, res, _next) => {
   console.error("[express]", err);
@@ -65,6 +67,12 @@ if (process.env.NODE_ENV === "production") {
 
 initDb()
   .then(() => {
+    setInterval(function () {
+      runWeeklyThemeMaintenance().catch(function (e) {
+        console.error("[weekly-theme]", e && e.message ? e.message : e);
+      });
+    }, 10 * 60 * 1000);
+
     const server = app.listen(PORT);
     attachRoomTaskWebSocket(server);
 

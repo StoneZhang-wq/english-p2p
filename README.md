@@ -31,13 +31,14 @@ npm run dev
 
 | 方法 | 路径 | 说明 |
 |------|------|------|
-| GET | `/api/timeslots?theme=interview` | `theme`：`interview` / `ielts` / `chat`（与首页链接一致）；或 `theme_id` 数字 |
+| GET | `/api/themes` | 当前周三个主题（周日 19:00 上海起开放下一周） |
+| GET | `/api/timeslots?theme_id=1` | **`theme_id` 必填**（数字 id，来自 `/api/themes`） |
 | POST | `/api/bookings` | 需登录；Body `{ timeslot_id, level }`，`level`：`beginner` / `mid` / `adv` 或 `intermediate` 等 |
 | GET | `/api/bookings/mine` | 需登录；返回预约列表及搭档、`channel_name`（配对后） |
 
 预约写入使用 **事务 + `SELECT … FOR UPDATE`** 锁定场次行，校验 `status = 'open'` 与 `booked_count < max_pairs * 2`，防止超卖。
 
-首次启动且**无任何场次**时，会自动插入演示主题与场次（仅当 `timeslots` 表为空）。
+启动与定时任务会按**周主题轮换规则**补全 `themes` / `timeslots`（见 `ARCHITECTURE.md`）。
 
 **尚未实现**（按 `ARCHITECTURE.md` 后续迭代）：开场前 cron 配对算法、`pairs` 写入、邮件通知、**`POST /api/agora/rtc-token` 与登录态及 pair 绑定校验**（当前仍为演示级 Token）。配对可用一般图最大匹配（等级差≤1）在 `O(n³)` 内完成。
 

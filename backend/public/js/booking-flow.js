@@ -4,58 +4,24 @@
 (function () {
   if (document.body.getAttribute("data-page") !== "booking") return;
 
-  var themes = {
-    interview: {
-      title: "职场面试",
-      desc: "模拟英文面试，讨论职业规划",
-      cover: "https://images.unsplash.com/photo-1486406146926-c627a92ad1ab?w=800&q=80",
-      badge: "DAILY TOPIC",
-      scene:
-        "你来到一家知名的跨国科技公司参加面试。会议室灯光明亮，面试官坐在桌子对面，已经读过你的简历，正等待你用英语完成自我介绍并阐述你与岗位的匹配点。",
-      roles: [
-        { label: "ROLE 1", name: "面试官", desc: "负责评估你的专业能力、逻辑表达与英语流利度。" },
-        { label: "ROLE 2", name: "求职者", desc: "有备而来，展示经历并回答对方提问，争取留下好印象。" },
-      ],
-    },
-    ielts: {
-      title: "雅思口语 Part 2",
-      desc: "随机抽取题库进行 2 分钟独白练习",
-      cover: "https://images.unsplash.com/photo-1448375240586-882707db888b?w=800&q=80",
-      badge: "DAILY TOPIC",
-      scene:
-        "考官给出一张话题卡，你有一分钟准备时间，随后需要连续陈述约两分钟。对方会认真聆听，并在最后追问一两个相关问题。",
-      roles: [
-        { label: "ROLE 1", name: "考生", desc: "根据话题卡组织独白，注意时态与衔接词。" },
-        { label: "ROLE 2", name: "考官", desc: "提示开始/结束，并在 Part 2 后提出简短追问。" },
-      ],
-    },
-    chat: {
-      title: "日常闲聊",
-      desc: "轻松的话题，分享生活趣事",
-      cover: "https://images.unsplash.com/photo-1507525428034-b723cf961d3e?w=800&q=80",
-      badge: "DAILY TOPIC",
-      scene:
-        "咖啡馆靠窗的座位，你和刚认识的语伴决定用英语随便聊聊近况、旅行或周末计划，氛围轻松自然。",
-      roles: [
-        { label: "ROLE 1", name: "发起聊天的人", desc: "主动抛话题、接话并维持对话节奏。" },
-        { label: "ROLE 2", name: "倾听与回应", desc: "认真回应、追问细节，让对话延续下去。" },
-      ],
-    },
-  };
-
-  /** 与 `backend/data/previewMaterials.js` 保持同步（页内预览用；下载走 /api/preview-material/docx） */
-  var PREVIEW_MARKDOWN = {
-    interview:
-      "## Key vocabulary\n- **initiate** — 发起；开始\n- **candidate** — 候选人\n- **qualification** — 资质\n\n## Useful lines\n- I would like to elaborate on my experience in…\n- Could you tell me more about the team structure?\n",
-    ielts:
-      "## Part 2 tips\n- Use the **one-minute** prep to jot down **keywords**.\n- Structure: introduction → main points → conclusion.\n\n## Sample stems\n- Describe a place you visited…\n- Talk about an important decision…\n",
-    chat:
-      "## Small talk\n- **How's your day going?**\n- **Any plans for the weekend?**\n\n## Light fillers\n- That's interesting!\n- I see what you mean.\n",
-  };
-
   var params = new URLSearchParams(window.location.search);
-  var themeKey = params.get("theme") || "interview";
-  var meta = themes[themeKey] || themes.interview;
+  var themeId = Number(params.get("theme_id"));
+  if (!themeId || Number.isNaN(themeId)) {
+    window.location.replace("index.html");
+    return;
+  }
+
+  /** 由 /api/themes/by-id 填充 */
+  var meta = {
+    title: "",
+    desc: "",
+    cover: "",
+    badge: "本周主题",
+    scene: "",
+    roles: [],
+    previewMarkdown: "",
+    isActive: true,
+  };
 
   function escHtml(s) {
     var d = document.createElement("div");
@@ -65,7 +31,7 @@
 
   function fillSceneAndRoles() {
     var badgeEl = document.getElementById("themeBadge");
-    if (badgeEl) badgeEl.textContent = meta.badge || "DAILY TOPIC";
+    if (badgeEl) badgeEl.textContent = meta.badge || "本周主题";
     document.getElementById("themeTitle").textContent = meta.title;
     document.getElementById("themeDesc").textContent = meta.desc;
     var img = document.getElementById("themeCover");
@@ -93,8 +59,6 @@
         .join("");
     }
   }
-
-  fillSceneAndRoles();
 
   var grid = document.getElementById("slotGrid");
   var pollStatus = document.getElementById("bookingPollStatus");
@@ -269,11 +233,10 @@
   });
 
   function hasActiveBookingForCurrentTheme(bookings) {
-    var title = meta.title;
     var now = Date.now();
     if (!bookings || !bookings.length) return false;
     return bookings.some(function (b) {
-      if (b.themeName !== title) return false;
+      if (Number(b.themeId) !== themeId) return false;
       if (String(b.bookingStatus || "").toLowerCase() !== "confirmed") return false;
       var end = parseDbTime(b.endTime);
       if (end && end.getTime() < now) return false;
@@ -291,7 +254,7 @@
       previewOpen = false;
       if (previewRoot) previewRoot.hidden = true;
     } else if (previewBody) {
-      previewBody.textContent = PREVIEW_MARKDOWN[themeKey] || PREVIEW_MARKDOWN.interview;
+      previewBody.textContent = meta.previewMarkdown || "";
     }
   }
 
@@ -315,7 +278,7 @@
   }
 
   function loadSlots() {
-    return fetch("/api/timeslots?theme=" + encodeURIComponent(themeKey), { credentials: "include" })
+    return fetch("/api/timeslots?theme_id=" + encodeURIComponent(String(themeId)), { credentials: "include" })
       .then(function (r) {
         return r.json().then(function (j) {
           return { ok: r.ok, j: j };
@@ -355,14 +318,14 @@
       previewOpen = !previewOpen;
       previewRoot.hidden = !previewOpen;
       if (previewOpen && previewBody) {
-        previewBody.textContent = PREVIEW_MARKDOWN[themeKey] || PREVIEW_MARKDOWN.interview;
+        previewBody.textContent = meta.previewMarkdown || "";
       }
     });
   }
 
   if (btnDownloadMd) {
     btnDownloadMd.addEventListener("click", function () {
-      var url = "/api/preview-material/docx?theme=" + encodeURIComponent(themeKey);
+      var url = "/api/preview-material/docx?theme_id=" + encodeURIComponent(String(themeId));
       fetch(url, { credentials: "include" })
         .then(function (r) {
           if (!r.ok) return r.json().then(function (j) { throw new Error((j && j.message) || "下载失败"); });
@@ -402,7 +365,7 @@
             return fetchMineForPreview().then(function () {
               previewOpen = true;
               if (previewRoot) previewRoot.hidden = false;
-              if (previewBody) previewBody.textContent = PREVIEW_MARKDOWN[themeKey] || PREVIEW_MARKDOWN.interview;
+              if (previewBody) previewBody.textContent = meta.previewMarkdown || "";
               return loadSlots();
             });
           }
@@ -432,11 +395,44 @@
     } catch (_) {}
   }
 
-  loadSlots()
-    .then(function () {
-      return fetchMineForPreview();
-    })
-    .then(function () {
-      startPollingLoop();
-    });
+  function boot() {
+    fetch("/api/themes/by-id?id=" + encodeURIComponent(String(themeId)))
+      .then(function (r) {
+        return r.json().then(function (j) {
+          return { ok: r.ok, j: j };
+        });
+      })
+      .then(function (x) {
+        if (!x.ok || x.j.code !== 0 || !x.j.data || !x.j.data.theme) {
+          window.alert(x.j && x.j.message ? x.j.message : "主题加载失败");
+          window.location.replace("index.html");
+          return;
+        }
+        var t = x.j.data.theme;
+        meta.title = t.name || "";
+        meta.desc = t.description || "";
+        meta.cover = t.coverUrl || "";
+        meta.scene = t.sceneText || "";
+        meta.roles = Array.isArray(t.roles) ? t.roles : [];
+        meta.previewMarkdown = t.previewMarkdown || "";
+        meta.isActive = t.isActive !== false;
+        fillSceneAndRoles();
+        if (!meta.isActive) {
+          setPollStatus("该主题所属练习周已结束，仅可查看历史信息。", true);
+        }
+        return loadSlots()
+          .then(function () {
+            return fetchMineForPreview();
+          })
+          .then(function () {
+            startPollingLoop();
+          });
+      })
+      .catch(function () {
+        window.alert("网络错误");
+        window.location.replace("index.html");
+      });
+  }
+
+  boot();
 })();

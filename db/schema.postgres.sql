@@ -18,8 +18,17 @@ CREATE TABLE IF NOT EXISTS themes (
   difficulty_level VARCHAR(20) DEFAULT 'intermediate',
   task_card_a TEXT,
   task_card_b TEXT,
-  is_active INTEGER NOT NULL DEFAULT 1
+  is_active INTEGER NOT NULL DEFAULT 1,
+  shanghai_week_monday DATE,
+  theme_slot SMALLINT NOT NULL DEFAULT 0,
+  slug VARCHAR(64),
+  scene_text TEXT,
+  roles_json TEXT,
+  cover_url TEXT,
+  preview_markdown TEXT
 );
+
+CREATE UNIQUE INDEX IF NOT EXISTS idx_themes_week_slot ON themes (shanghai_week_monday, theme_slot) WHERE shanghai_week_monday IS NOT NULL AND is_active = 1;
 
 CREATE TABLE IF NOT EXISTS timeslots (
   id SERIAL PRIMARY KEY,
