@@ -1,15 +1,19 @@
 /**
- * 我的预约：短轮询 GET /api/bookings/mine，展示搭档 / 进房链接；失败指数退避。
+ * 我的预约：短轮询 GET /api/bookings/mine；分「即将开始 / 过往记录」Tabs。
  */
 (function () {
   if (document.body.getAttribute("data-page") !== "appointments") return;
 
-  var root = document.getElementById("liveBookings");
+  var panelUp = document.getElementById("panelUpcoming");
+  var panelPast = document.getElementById("panelPast");
   var statusEl = document.getElementById("apptPollStatus");
-  if (!root) return;
+  var tabUp = document.getElementById("tabUpcoming");
+  var tabPast = document.getElementById("tabPast");
+  if (!panelUp || !panelPast) return;
 
   var backoff = window.createPollBackoff ? window.createPollBackoff(8000, 60000) : null;
   var myUid = null;
+  var activeTab = "upcoming";
 
   function setStatus(text, isErr) {
     if (!statusEl) return;
@@ -24,64 +28,141 @@
     return d.innerHTML;
   }
 
+  function parseDbTime(s) {
+    if (!s) return null;
+    var d = new Date(String(s).replace(" ", "T"));
+    return Number.isNaN(d.getTime()) ? null : d;
+  }
+
   function formatTime(iso) {
     if (!iso) return "—";
-    var d = new Date(iso.replace(" ", "T"));
-    if (Number.isNaN(d.getTime())) return iso;
+    var d = parseDbTime(iso);
+    if (!d) return iso;
     function p2(n) {
       return n < 10 ? "0" + n : String(n);
     }
     return d.getFullYear() + "-" + p2(d.getMonth() + 1) + "-" + p2(d.getDate()) + " " + p2(d.getHours()) + ":" + p2(d.getMinutes());
   }
 
-  function render(bookings) {
-    root.innerHTML = "";
+  function isPastBooking(b) {
+    var now = Date.now();
+    if (String(b.bookingStatus || "").toLowerCase() !== "confirmed") return true;
+    if (String(b.slotStatus || "").toLowerCase() === "cancelled") return true;
+    var end = parseDbTime(b.endTime);
+    if (end && end.getTime() < now) return true;
+    return false;
+  }
+
+  function renderCard(b, past) {
+    var cap = (b.maxPairs || 0) * 2;
+    var tagText;
+    var tagClass;
+    if (past) {
+      tagClass = "past";
+      tagText = String(b.slotStatus || "").toLowerCase() === "cancelled" ? "已取消" : "已结束";
+    } else if (b.channelName) {
+      tagClass = "paired";
+      tagText = "已配对";
+    } else {
+      tagClass = "pending";
+      tagText = "待匹配";
+    }
+
+    var partnerLine = b.partnerNickname
+      ? "搭档：" + esc(b.partnerNickname) + (b.partnerCreditScore != null ? "（信用 " + b.partnerCreditScore + "）" : "")
+      : past
+        ? "搭档：—"
+        : "搭档：配对完成后显示";
+
+    var enter = "";
+    if (!past && b.channelName && myUid != null) {
+      var href =
+        "room.html?channel=" +
+        encodeURIComponent(b.channelName) +
+        "&uid=" +
+        encodeURIComponent(String(myUid));
+      enter = '<a class="btn-enter" href="' + href + '">进入房间</a>';
+    }
+
+    var art = document.createElement("article");
+    art.className = "appt-card";
+    art.innerHTML =
+      '<div class="row-top">' +
+      "<h2>" +
+      esc(b.themeName) +
+      '</h2><span class="status-tag ' +
+      tagClass +
+      '">' +
+      esc(tagText) +
+      "</span></div>" +
+      '<div class="appt-meta">时间：' +
+      esc(formatTime(b.startTime)) +
+      "<br />人数：" +
+      esc(b.bookedCount) +
+      "/" +
+      esc(cap) +
+      "<br />" +
+      partnerLine +
+      "</div>" +
+      enter;
+    return art;
+  }
+
+  function renderPanels(bookings) {
+    panelUp.innerHTML = "";
+    panelPast.innerHTML = "";
     if (!bookings || bookings.length === 0) {
-      root.innerHTML =
-        '<p class="booking-empty">暂无预约。<a href="index.html">去首页选主题</a></p>';
+      panelUp.innerHTML =
+        '<p class="appt-empty">暂无预约。<a href="index.html">去首页选主题</a></p>';
+      panelPast.innerHTML = '<p class="appt-empty">暂无过往记录。</p>';
       return;
     }
 
+    var upcoming = [];
+    var past = [];
     bookings.forEach(function (b) {
-      var cap = b.maxPairs * 2;
-      var tagClass = b.pairStatus === "confirmed" || b.channelName ? "done" : "pending";
-      var tagText = b.channelName ? "已配对" : "待配对";
-      var partnerLine = b.partnerNickname
-        ? "搭档：" + esc(b.partnerNickname) + (b.partnerCreditScore != null ? "（信用 " + b.partnerCreditScore + "）" : "")
-        : "搭档：配对完成后显示";
+      if (isPastBooking(b)) past.push(b);
+      else upcoming.push(b);
+    });
 
-      var enter = "";
-      if (b.channelName && myUid != null) {
-        var href =
-          "room.html?channel=" +
-          encodeURIComponent(b.channelName) +
-          "&uid=" +
-          encodeURIComponent(String(myUid));
-        enter = '<a class="btn-enter" href="' + href + '">进入房间</a>';
-      }
+    if (upcoming.length === 0) {
+      panelUp.innerHTML = '<p class="appt-empty">暂无即将开始的场次。</p>';
+    } else {
+      upcoming.forEach(function (b) {
+        panelUp.appendChild(renderCard(b, false));
+      });
+    }
 
-      var art = document.createElement("article");
-      art.className = "appt-card";
-      art.innerHTML =
-        '<div class="row-top">' +
-        "<h2>" +
-        esc(b.themeName) +
-        '</h2><span class="status-tag ' +
-        tagClass +
-        '">' +
-        esc(tagText) +
-        "</span></div>" +
-        '<div class="appt-meta">时间：' +
-        esc(formatTime(b.startTime)) +
-        "<br />人数：" +
-        esc(b.bookedCount) +
-        "/" +
-        esc(cap) +
-        "<br />" +
-        partnerLine +
-        "</div>" +
-        enter;
-      root.appendChild(art);
+    if (past.length === 0) {
+      panelPast.innerHTML = '<p class="appt-empty">暂无过往记录。</p>';
+    } else {
+      past.forEach(function (b) {
+        panelPast.appendChild(renderCard(b, true));
+      });
+    }
+  }
+
+  function setTab(tab) {
+    activeTab = tab;
+    var up = tab === "upcoming";
+    if (tabUp) {
+      tabUp.classList.toggle("appt-tab--active", up);
+      tabUp.setAttribute("aria-selected", up ? "true" : "false");
+    }
+    if (tabPast) {
+      tabPast.classList.toggle("appt-tab--active", !up);
+      tabPast.setAttribute("aria-selected", up ? "false" : "true");
+    }
+    panelUp.hidden = !up;
+    panelPast.hidden = up;
+  }
+
+  if (tabUp && tabPast) {
+    tabUp.addEventListener("click", function () {
+      setTab("upcoming");
+    });
+    tabPast.addEventListener("click", function () {
+      setTab("past");
     });
   }
 
@@ -105,15 +186,15 @@
       })
       .then(function (x) {
         if (x.status === 401) {
-          root.innerHTML =
-            '<p class="booking-empty">请先 <a href="login.html">登录</a> 查看预约。</p>';
+          panelUp.innerHTML = '<p class="booking-empty">请先 <a href="login.html">登录</a> 查看预约。</p>';
+          panelPast.innerHTML = "";
           setStatus("");
           return true;
         }
         if (!x.ok || x.j.code !== 0) {
           throw new Error(x.j.message || "加载失败");
         }
-        render(x.j.data.bookings);
+        renderPanels(x.j.data.bookings);
         if (backoff) backoff.reset();
         setStatus("");
         return true;
@@ -133,6 +214,8 @@
     }
     setTimeout(tick, 8000);
   }
+
+  setTab("upcoming");
 
   fetchMeUid()
     .then(function () {

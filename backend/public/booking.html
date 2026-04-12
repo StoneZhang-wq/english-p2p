@@ -17,19 +17,28 @@
         </a>
       </div>
 
-      <div class="theme-hero">
-        <img class="cover" id="themeCover" src="" alt="" />
+      <div class="theme-hero-card">
+        <div class="theme-hero-visual">
+          <img class="cover" id="themeCover" src="" alt="" />
+          <div class="theme-hero-overlay">
+            <span class="theme-pill" id="themeBadge">DAILY TOPIC</span>
+            <h1 class="theme-hero-overlay__title" id="themeTitle">职场面试</h1>
+            <p class="theme-hero-overlay__desc" id="themeDesc">模拟英文面试，讨论职业规划</p>
+          </div>
+        </div>
       </div>
-      <div class="theme-hero-text">
-        <h1 id="themeTitle">职场面试</h1>
-        <p id="themeDesc">模拟英文面试，讨论职业规划</p>
-      </div>
+
+      <section class="booking-scene" aria-labelledby="sceneHeading">
+        <h2 class="booking-scene__heading" id="sceneHeading">场景背景</h2>
+        <blockquote class="booking-scene__quote" id="sceneQuote"></blockquote>
+        <div class="role-grid" id="roleGrid"></div>
+      </section>
 
       <p class="booking-poll-status" id="bookingPollStatus" hidden role="status"></p>
-      <h2 class="section-title">1. 选择预约时间</h2>
+      <h2 class="section-title"><span class="section-title__num">1</span> 选择预约时间</h2>
       <div class="slot-grid" id="slotGrid"></div>
 
-      <h2 class="section-title">2. 选择你的口语水平</h2>
+      <h2 class="section-title"><span class="section-title__num">2</span> 选择你的口语水平</h2>
       <div class="level-row">
         <button type="button" class="level-card" data-level="beginner">
           <div class="lv">初级</div>
@@ -48,16 +57,43 @@
       <div class="tip-box">
         <span class="icon" aria-hidden="true">💡</span>
         <span
-          >我们会尽量为你匹配水平相近的伙伴（差距不超过一级），开场前 5
-          分钟通知你搭档是谁。</span
+          >同一场次下，我们会按水平（差距不超过一级）尽早为你配对；一旦配对成功会立刻在个人中心与通知里告诉你搭档是谁。开场前 1
+          小时停止新预约与首次配对。</span
         >
       </div>
 
-      <button type="button" class="btn-primary">确认预约</button>
+      <section id="previewMaterialsRoot" class="preview-materials" hidden aria-labelledby="previewMaterialsHeading">
+        <h2 id="previewMaterialsHeading" class="preview-materials__title">预习 / 复习资料已就绪</h2>
+        <p class="preview-materials__hint">以下为当前主题的参考词汇与句型，可在练习前快速浏览。</p>
+        <div id="previewMaterialsBody" class="preview-materials__body"></div>
+        <button type="button" class="preview-materials__download" id="btnDownloadPreviewMd">
+          <span class="preview-materials__download-icon" aria-hidden="true">↓</span>
+          下载 Markdown 资料
+        </button>
+      </section>
+
+      <p class="booking-toast" id="bookingToast" hidden role="status"></p>
+    </div>
+
+    <div class="booking-action-bar" role="toolbar" aria-label="预约与预习资料">
+      <button type="button" class="btn-primary booking-action-bar__main" id="btnConfirmBook">确认预约</button>
+      <button
+        type="button"
+        class="booking-action-bar__preview"
+        id="btnPreviewMaterials"
+        hidden
+        aria-label="打开预习资料"
+        title="预习资料（需已预约本主题）"
+      >
+        <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true">
+          <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" />
+          <path d="M14 2v6h6M16 13H8M16 17H8M10 9H8" />
+        </svg>
+      </button>
     </div>
 
     <nav class="bottom-nav" aria-label="主导航">
-      <a href="index.html" class="active" aria-current="page">
+      <a href="index.html">
         <svg viewBox="0 0 24 24" aria-hidden="true">
           <path d="M3 10.5L12 3l9 7.5V20a1 1 0 0 1-1 1h-5v-6H9v6H4a1 1 0 0 1-1-1v-9.5z" />
         </svg>

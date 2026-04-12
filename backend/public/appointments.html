@@ -10,7 +10,14 @@
     <div class="app-shell">
       <h1 class="page-title-simple">我的预约</h1>
       <p class="appt-poll-status" id="apptPollStatus" hidden role="status"></p>
-      <div id="liveBookings"></div>
+      <div class="appt-tabs" role="tablist" aria-label="预约分类">
+        <button type="button" class="appt-tab appt-tab--active" role="tab" aria-selected="true" data-tab="upcoming" id="tabUpcoming">
+          即将开始
+        </button>
+        <button type="button" class="appt-tab" role="tab" aria-selected="false" data-tab="past" id="tabPast">过往记录</button>
+      </div>
+      <div id="panelUpcoming" class="appt-tab-panel" role="tabpanel" aria-labelledby="tabUpcoming"></div>
+      <div id="panelPast" class="appt-tab-panel appt-tab-panel--past" role="tabpanel" aria-labelledby="tabPast" hidden></div>
     </div>
 
     <nav class="bottom-nav" aria-label="主导航">

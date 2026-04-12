@@ -58,6 +58,11 @@ body {
   padding-bottom: calc(var(--tab-h) + var(--safe-bottom) + 12px);
 }
 
+/* 预约详情：底部固定操作栏 + 底栏导航，需额外留白（工具栏 bottom 使用 max(4rem, …) 避开重叠） */
+body[data-page="booking"] {
+  padding-bottom: calc(4rem + var(--tab-h) + var(--safe-bottom) + 7rem);
+}
+
 body.page-room {
   background: var(--room-bg);
   color: #f3f4f6;
@@ -211,7 +216,7 @@ img {
   line-height: 1.1;
 }
 
-/* —— 主题卡片 —— */
+/* —— 主题卡片（首页：FEATURED + 图内标题 + 脚标） —— */
 .topic-card {
   display: block;
   color: inherit;
@@ -223,27 +228,90 @@ img {
   margin-bottom: 16px;
 }
 
-.topic-card .cover {
+.topic-card__media {
+  position: relative;
   aspect-ratio: 16 / 9;
   background: linear-gradient(135deg, #64748b 0%, #334155 100%);
-  object-fit: cover;
+}
+
+.topic-card__media .cover {
   width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
+}
+
+.topic-pill {
+  position: absolute;
+  top: 12px;
+  left: 12px;
+  z-index: 2;
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 4px 10px;
+  border-radius: 6px;
+  font-size: 0.5625rem;
+  font-weight: 800;
+  letter-spacing: 0.05em;
+  background: rgba(26, 92, 255, 0.92);
+  color: #fff;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.2);
+}
+
+.topic-card__shade {
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  padding: 16px 14px 14px;
+  background: linear-gradient(180deg, transparent 0%, rgba(15, 23, 42, 0.5) 40%, rgba(15, 23, 42, 0.88) 100%);
+}
+
+.topic-card__overlay-title {
+  margin: 0 0 4px;
+  font-size: 1.125rem;
+  font-weight: 700;
+  color: #fff;
+  text-shadow: 0 1px 3px rgba(0, 0, 0, 0.35);
+}
+
+.topic-card__overlay-desc {
+  margin: 0;
+  font-size: 0.75rem;
+  line-height: 1.4;
+  color: rgba(255, 255, 255, 0.9);
+  text-shadow: 0 1px 2px rgba(0, 0, 0, 0.35);
 }
 
 .topic-card .body {
-  padding: 14px 16px 16px;
+  padding: 12px 14px 14px;
 }
 
-.topic-card h2 {
-  margin: 0 0 6px;
-  font-size: 1.0625rem;
-  font-weight: 700;
-}
-
-.topic-card p {
-  margin: 0;
+.topic-card__roles {
+  display: flex;
+  align-items: center;
+  gap: 8px;
   font-size: 0.8125rem;
   color: var(--text-secondary);
+}
+
+.topic-card__role-ico {
+  font-size: 1rem;
+  opacity: 0.85;
+}
+
+.topic-card__roles-text {
+  flex: 1;
+  font-weight: 500;
+  color: var(--text-primary);
+}
+
+.topic-card__chev {
+  font-size: 1.25rem;
+  font-weight: 300;
+  color: var(--text-muted);
+  line-height: 1;
 }
 
 /* —— 预约页顶栏 —— */
@@ -265,29 +333,127 @@ img {
   height: 18px;
 }
 
-.theme-hero {
+/* —— 预约页：头图 + 叠字（对齐设计稿） —— */
+.theme-hero-card {
+  margin-bottom: 16px;
   border-radius: var(--radius-card);
   overflow: hidden;
-  margin-bottom: 12px;
   box-shadow: var(--shadow-card);
 }
 
-.theme-hero .cover {
+.theme-hero-visual {
+  position: relative;
   aspect-ratio: 16 / 9;
-  width: 100%;
-  object-fit: cover;
   background: linear-gradient(135deg, #1e3a5f 0%, #0f172a 100%);
 }
 
-.theme-hero-text h1 {
-  margin: 12px 0 6px;
-  font-size: 1.375rem;
-  font-weight: 700;
+.theme-hero-visual .cover {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
 }
 
-.theme-hero-text p {
-  margin: 0 0 8px;
+.theme-hero-overlay {
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  padding: 20px 16px 18px;
+  background: linear-gradient(180deg, transparent 0%, rgba(15, 23, 42, 0.55) 38%, rgba(15, 23, 42, 0.88) 100%);
+  color: #fff;
+}
+
+.theme-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 4px 10px;
+  border-radius: 6px;
+  font-size: 0.625rem;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  background: rgba(37, 99, 235, 0.95);
+  color: #eff6ff;
+  margin-bottom: 10px;
+}
+
+.theme-hero-overlay__title {
+  margin: 0 0 6px;
+  font-size: 1.375rem;
+  font-weight: 700;
+  line-height: 1.25;
+  text-shadow: 0 1px 3px rgba(0, 0, 0, 0.35);
+}
+
+.theme-hero-overlay__desc {
+  margin: 0;
+  font-size: 0.8125rem;
+  line-height: 1.45;
+  color: rgba(255, 255, 255, 0.88);
+  text-shadow: 0 1px 2px rgba(0, 0, 0, 0.35);
+}
+
+/* —— 预约页：场景背景 + 双角色 —— */
+.booking-scene {
+  margin-bottom: 8px;
+  padding: 16px 16px 18px;
+  background: var(--bg-card);
+  border: 1px solid var(--border-light);
+  border-radius: var(--radius-card);
+  box-shadow: var(--shadow-card);
+}
+
+.booking-scene__heading {
+  margin: 0 0 12px;
+  font-size: 1rem;
+  font-weight: 700;
+  color: var(--text-primary);
+}
+
+.booking-scene__quote {
+  margin: 0 0 16px;
+  padding: 0 0 0 12px;
+  border-left: 3px solid var(--blue-soft);
   font-size: 0.875rem;
+  font-style: italic;
+  line-height: 1.65;
+  color: var(--text-secondary);
+}
+
+.role-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 10px;
+}
+
+.role-card {
+  padding: 12px 10px;
+  border-radius: 10px;
+  border: 1px solid var(--border-light);
+  background: linear-gradient(180deg, #f8fafc 0%, #fff 100%);
+}
+
+.role-card__label {
+  display: block;
+  font-size: 0.5625rem;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  color: var(--blue-primary);
+  margin-bottom: 6px;
+}
+
+.role-card__name {
+  margin: 0 0 6px;
+  font-size: 0.875rem;
+  font-weight: 700;
+  color: var(--text-primary);
+}
+
+.role-card__desc {
+  margin: 0;
+  font-size: 0.6875rem;
+  line-height: 1.45;
   color: var(--text-secondary);
 }
 
@@ -295,6 +461,13 @@ img {
   margin: 22px 0 12px;
   font-size: 1rem;
   font-weight: 700;
+}
+
+.section-title__num {
+  display: inline-block;
+  margin-right: 6px;
+  font-weight: 800;
+  color: var(--blue-primary);
 }
 
 /* —— 时间段网格 —— */
@@ -305,35 +478,61 @@ img {
 }
 
 .slot-card {
+  position: relative;
   background: var(--bg-card);
   border: 1px solid var(--border-light);
-  border-radius: 10px;
-  padding: 14px 12px;
+  border-radius: 12px;
+  padding: 16px 12px 14px;
+  min-height: 88px;
   text-align: center;
   cursor: pointer;
-  transition: border-color 0.15s, background 0.15s;
+  transition: border-color 0.15s, background 0.15s, box-shadow 0.15s;
 }
 
-.slot-card .time {
-  font-size: 1.0625rem;
-  font-weight: 600;
+.slot-card__time {
+  font-size: 1.25rem;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+  color: var(--text-primary);
 }
 
-.slot-card .meta {
-  margin-top: 4px;
+.slot-card__meta {
+  margin-top: 6px;
   font-size: 0.75rem;
   color: var(--text-secondary);
 }
 
+.slot-card__sub {
+  margin-top: 6px;
+  font-size: 0.6875rem;
+  color: var(--blue-primary);
+  font-weight: 500;
+}
+
+.slot-card__sub--muted {
+  color: var(--text-muted);
+  font-weight: 400;
+}
+
 .slot-card.selected {
   background: var(--blue-soft-bg);
-  border-color: var(--blue-soft-border);
+  border: 2px solid var(--blue-soft-border);
+  color: var(--blue-soft-border);
+  box-shadow: 0 0 0 1px rgba(79, 70, 229, 0.12);
+}
+
+.slot-card.selected .slot-card__time {
   color: var(--blue-soft-border);
 }
 
-.slot-card.selected .meta {
-  color: var(--blue-soft-border);
-  opacity: 0.85;
+.slot-card.selected .slot-card__meta,
+.slot-card.selected .slot-card__sub {
+  color: #4338ca;
+}
+
+.slot-card.selected .slot-card__sub--muted {
+  color: #6366f1;
+  opacity: 0.9;
 }
 
 /* —— 水平三选一 —— */
@@ -421,6 +620,210 @@ img {
   opacity: 0.5;
   cursor: not-allowed;
   box-shadow: none;
+}
+
+/* —— 预约页：固定底部工具栏（确认预约 + 预习入口），避开 bottom-nav —— */
+.booking-action-bar {
+  position: fixed;
+  left: 50%;
+  transform: translateX(-50%);
+  bottom: max(4rem, calc(var(--tab-h) + var(--safe-bottom) + 0.75rem));
+  width: 100%;
+  max-width: 480px;
+  padding: 0 16px;
+  display: flex;
+  flex-direction: row;
+  align-items: stretch;
+  gap: 10px;
+  z-index: 90;
+  box-sizing: border-box;
+  pointer-events: none;
+}
+
+.booking-action-bar > * {
+  pointer-events: auto;
+}
+
+.booking-action-bar__main {
+  flex: 1;
+  margin: 0 !important;
+  min-height: 48px;
+}
+
+.booking-action-bar .btn-primary {
+  margin-top: 0;
+}
+
+.booking-action-bar__preview {
+  width: 52px;
+  min-width: 52px;
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border: 1px solid var(--border-light);
+  border-radius: var(--radius-btn);
+  background: var(--bg-card);
+  color: var(--blue-primary);
+  cursor: pointer;
+  box-shadow: var(--shadow-card);
+  transition: background 0.15s, transform 0.1s;
+}
+
+.booking-action-bar__preview:active {
+  transform: scale(0.97);
+}
+
+.booking-action-bar__preview[hidden] {
+  display: none !important;
+}
+
+.slot-card--closed {
+  opacity: 0.55;
+  cursor: not-allowed;
+}
+
+.slot-card__badge {
+  position: absolute;
+  top: 8px;
+  right: 8px;
+  padding: 3px 8px;
+  border-radius: 6px;
+  font-size: 0.5625rem;
+  font-weight: 700;
+  background: #f3f4f6;
+  color: var(--text-secondary);
+  border: 1px solid var(--border-light);
+}
+
+/* —— 预习资料区块 —— */
+.preview-materials {
+  margin-top: 20px;
+  padding: 14px 16px 16px;
+  border-radius: var(--radius-card);
+  background: linear-gradient(180deg, #ecfdf5 0%, #d1fae5 100%);
+  border: 1px solid #6ee7b7;
+}
+
+.preview-materials[hidden] {
+  display: none !important;
+}
+
+.preview-materials__title {
+  margin: 0 0 8px;
+  font-size: 1rem;
+  font-weight: 700;
+  color: #065f46;
+}
+
+.preview-materials__hint {
+  margin: 0 0 10px;
+  font-size: 0.8125rem;
+  color: #047857;
+  line-height: 1.45;
+}
+
+.preview-materials__body {
+  max-height: 220px;
+  overflow: auto;
+  padding: 12px;
+  border-radius: 10px;
+  background: rgba(255, 255, 255, 0.85);
+  font-size: 0.8125rem;
+  line-height: 1.55;
+  color: var(--text-primary);
+  white-space: pre-wrap;
+  word-break: break-word;
+}
+
+.preview-materials__download {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  width: 100%;
+  margin-top: 12px;
+  padding: 12px 14px;
+  border: none;
+  border-radius: 10px;
+  background: #0f766e;
+  color: #fff;
+  font-size: 0.875rem;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.preview-materials__download-icon {
+  font-weight: 700;
+}
+
+.booking-toast {
+  margin-top: 14px;
+  padding: 10px 14px;
+  border-radius: 10px;
+  background: #ecfdf5;
+  border: 1px solid #6ee7b7;
+  color: #065f46;
+  font-size: 0.875rem;
+  text-align: center;
+}
+
+.booking-toast[hidden] {
+  display: none !important;
+}
+
+/* —— 我的预约：Tabs —— */
+.appt-tabs {
+  display: flex;
+  margin: 12px 0 16px;
+  padding: 4px;
+  border-radius: 12px;
+  background: #e5e7eb;
+  gap: 4px;
+}
+
+.appt-tab {
+  flex: 1;
+  padding: 10px 12px;
+  border: none;
+  border-radius: 10px;
+  background: transparent;
+  font-size: 0.875rem;
+  font-weight: 600;
+  color: var(--text-secondary);
+  cursor: pointer;
+  transition: background 0.15s, color 0.15s;
+}
+
+.appt-tab--active {
+  background: #fff;
+  color: var(--text-primary);
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.08);
+}
+
+.appt-tab-panel[hidden] {
+  display: none !important;
+}
+
+.appt-tab-panel--past .appt-card {
+  opacity: 0.72;
+  filter: saturate(0.85);
+}
+
+.appt-tab-panel--past .appt-card:hover {
+  opacity: 0.88;
+}
+
+.appt-empty {
+  margin: 24px 0;
+  font-size: 0.9375rem;
+  color: var(--text-secondary);
+  text-align: center;
+}
+
+.status-tag.past {
+  background: #f3f4f6;
+  color: #6b7280;
 }
 
 /* —— 我的预约卡片 —— */
