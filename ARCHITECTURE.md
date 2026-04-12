@@ -255,7 +255,7 @@ SMS_ACCESS_SECRET=
 ## 9. 脚本约定（待 package.json）
 
 - `npm run dev`：`nodemon` 启动 `backend/app.js`
-- 应用启动：执行 `schema.postgres.sql`（`CREATE IF NOT EXISTS`）；`backend/db.js` 的 `initDb` 迁移 `themes` 周字段后，将无 `shanghai_week_monday` 的旧主题置为下架，再 **归档过期周** 并 **`ensureWeeklyThemeCycle`**：按 `weekThemeCycle.js` + `themeRotationPool.js` 写入**当前应开放**自然周的三个主题及该周周六/日 20:00 场次。进程内每 **10 分钟** 调用 `runWeeklyThemeMaintenance()` 以在周日晚自动轮换，无需仅依赖重启。
+- 应用启动：执行 `schema.postgres.sql`（`CREATE IF NOT EXISTS`）；**周主题相关唯一索引**不在该 SQL 中建（旧库已有 `themes` 表时会在 `ALTER` 列之前失败），改由 `migrateWeeklyThemesColumns` 在 `ALTER` 之后创建。随后将无 `shanghai_week_monday` 的旧主题置为下架，再 **归档过期周** 并 **`ensureWeeklyThemeCycle`**。进程内每 **10 分钟** 调用 `runWeeklyThemeMaintenance()`。
 - 生产：`pm2 start backend/app.js --name english-match`
 
 ---

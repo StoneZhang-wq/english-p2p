@@ -28,7 +28,7 @@ CREATE TABLE IF NOT EXISTS themes (
   preview_markdown TEXT
 );
 
-CREATE UNIQUE INDEX IF NOT EXISTS idx_themes_week_slot ON themes (shanghai_week_monday, theme_slot) WHERE shanghai_week_monday IS NOT NULL AND is_active = 1;
+-- 周主题唯一索引见 backend/db.js migrateWeeklyThemesColumns（须在 ALTER 之后执行）
 
 CREATE TABLE IF NOT EXISTS timeslots (
   id SERIAL PRIMARY KEY,
