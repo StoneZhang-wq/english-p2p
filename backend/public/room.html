@@ -17,7 +17,7 @@
       </p>
 
       <header class="room-top">
-        <div class="topic">银行取钱 · 角色扮演</div>
+        <div class="topic" id="roomTopicTitle">口语话题练习</div>
         <div class="room-timer" id="roomTimer">00:00</div>
       </header>
 
@@ -37,39 +37,79 @@
         </div>
       </div>
 
-      <p class="task-room-role">你的任务（收银员）</p>
-      <ul class="task-confirm-list" id="taskConfirmList" aria-label="子任务列表">
-        <li class="task-confirm-card" data-task-id="a1">
-          <div class="task-confirm-main">
-            <h4 class="task-confirm-title">主动询问取钱用途</h4>
-            <div class="task-confirm-reward">
-              <span>+10</span><span class="ico" aria-hidden="true">⚡</span>
-            </div>
+      <section class="room-tasks-panel" aria-labelledby="practiceTasksHeading">
+        <div class="room-tasks-head">
+          <h2 class="room-tasks-heading" id="practiceTasksHeading">
+            TASKS <span class="room-tasks-count" id="practiceTasksCount">(0/3)</span>
+          </h2>
+          <div class="room-tasks-actions">
+            <button type="button" class="room-tasks-icon-btn" id="practiceTasksRefresh" aria-label="刷新任务列表">
+              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true">
+                <path d="M21 12a9 9 0 0 0-9-9 9.75 9.75 0 0 0-6.74 2.74L3 8" />
+                <path d="M3 3v5h5M3 12a9 9 0 0 0 9 9 9.75 9.75 0 0 0 6.74-2.74L21 16" />
+                <path d="M21 21v-5h-5" />
+              </svg>
+            </button>
+            <button type="button" class="room-tasks-simulate" id="practiceTasksSimulate">模拟请求</button>
           </div>
-          <button type="button" class="task-complete-btn">完成</button>
-        </li>
-        <li class="task-confirm-card" data-task-id="a2">
-          <div class="task-confirm-main">
-            <h4 class="task-confirm-title">提出替代方案（如理财）</h4>
-            <div class="task-confirm-reward">
-              <span>+10</span><span class="ico" aria-hidden="true">⚡</span>
+        </div>
+        <ul class="practice-task-list" id="practiceTaskList" aria-label="练习任务列表">
+          <li class="practice-task-card" data-task-id="p1">
+            <div class="practice-task-row">
+              <h3 class="practice-task-title">询问对方正在读的书</h3>
+              <button type="button" class="practice-task-claim task-complete-btn">CLAIM</button>
             </div>
-          </div>
-          <button type="button" class="task-complete-btn">完成</button>
-        </li>
-        <li class="task-confirm-card" data-task-id="a3">
-          <div class="task-confirm-main">
-            <h4 class="task-confirm-title">让客户犹豫一次</h4>
-            <div class="task-confirm-reward">
-              <span>+10</span><span class="ico" aria-hidden="true">⚡</span>
+            <div class="practice-task-hints is-open">
+              <button type="button" class="practice-task-hints-toggle" aria-expanded="true">
+                <span>USEFUL SENTENCES</span>
+                <span class="practice-task-hints-chev" aria-hidden="true">▲</span>
+              </button>
+              <div class="practice-task-hints-body">
+                <p class="practice-hint-line">Excuse me, is that "The Great Gatsby"?</p>
+                <p class="practice-hint-line">I noticed you're reading my favorite book.</p>
+                <p class="practice-hint-line">How do you like the book so far?</p>
+              </div>
             </div>
-          </div>
-          <button type="button" class="task-complete-btn">完成</button>
-        </li>
-      </ul>
+          </li>
+          <li class="practice-task-card" data-task-id="p2">
+            <div class="practice-task-row">
+              <h3 class="practice-task-title">推荐一款咖啡</h3>
+              <button type="button" class="practice-task-claim task-complete-btn">CLAIM</button>
+            </div>
+            <div class="practice-task-hints">
+              <button type="button" class="practice-task-hints-toggle" aria-expanded="false">
+                <span>USEFUL SENTENCES</span>
+                <span class="practice-task-hints-chev" aria-hidden="true">▼</span>
+              </button>
+              <div class="practice-task-hints-body">
+                <p class="practice-hint-line">If you like something smooth, try a flat white.</p>
+                <p class="practice-hint-line">Do you prefer your coffee strong or mild?</p>
+                <p class="practice-hint-line">This shop is famous for its cold brew.</p>
+              </div>
+            </div>
+          </li>
+          <li class="practice-task-card" data-task-id="p3">
+            <div class="practice-task-row">
+              <h3 class="practice-task-title">交换联系方式</h3>
+              <button type="button" class="practice-task-claim task-complete-btn">CLAIM</button>
+            </div>
+            <div class="practice-task-hints">
+              <button type="button" class="practice-task-hints-toggle" aria-expanded="false">
+                <span>USEFUL SENTENCES</span>
+                <span class="practice-task-hints-chev" aria-hidden="true">▼</span>
+              </button>
+              <div class="practice-task-hints-body">
+                <p class="practice-hint-line">Would you like to keep in touch after this session?</p>
+                <p class="practice-hint-line">I can share my WeChat if you're comfortable with that.</p>
+                <p class="practice-hint-line">Let me know what app you use most often.</p>
+              </div>
+            </div>
+          </li>
+        </ul>
+      </section>
 
       <div class="task-call-stage">
-        <p class="task-call-hint">实时语音通话中 · 点击「完成」后等待对方确认</p>
+        <p class="task-call-hint">实时语音通话中 · 点击「CLAIM」将通知对方，请对方确认你是否完成该任务</p>
         <div class="video-row video-row--compact">
           <div class="video-tile video-tile--partner" id="tilePartner">
             <div class="video-tile__media" id="remoteVideoSlot" aria-hidden="true"></div>
@@ -147,6 +187,7 @@
     </div>
 
     <script src="js/room.js"></script>
+    <script src="js/room-practice-tasks.js"></script>
     <script src="js/room-tasks.js"></script>
     <script>
       (function () {

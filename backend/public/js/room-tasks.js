@@ -1,8 +1,8 @@
 /**
- * 任务确认：点击「完成」→ 经 WebSocket 通知同频道对端弹出确认条 → 结果回传完成方
+ * 任务确认：点击「CLAIM」→ 经 WebSocket 通知同频道对端弹出确认条 → 结果回传完成方
  */
 (function () {
-  var list = document.getElementById("taskConfirmList");
+  var list = document.getElementById("practiceTaskList");
   var bar = document.getElementById("partnerConfirmBar");
   var barText = document.getElementById("partnerConfirmText");
   var btnOk = document.getElementById("partnerOk");
@@ -65,31 +65,35 @@
   function markCardDone(card, btn) {
     card.classList.add("is-done");
     btn.disabled = true;
-    btn.textContent = "已完成";
+    btn.textContent = "已认领";
     btn.classList.remove("is-waiting");
     btn.classList.add("is-done");
     showToast("+10 能量", false);
+    if (window.__practiceTasksRefreshCount) window.__practiceTasksRefreshCount();
   }
 
   function markCardRejected(card, btn) {
     btn.disabled = false;
-    btn.textContent = "完成";
+    btn.textContent = "CLAIM";
     btn.classList.remove("is-waiting", "is-done");
     showToast("对方否认，任务未完成", true);
+    if (window.__practiceTasksRefreshCount) window.__practiceTasksRefreshCount();
   }
 
   function markCardTimeout(card, btn) {
     btn.disabled = false;
-    btn.textContent = "完成";
+    btn.textContent = "CLAIM";
     btn.classList.remove("is-waiting");
     showToast("确认超时，未计入能量（可稍后补确认）", false);
+    if (window.__practiceTasksRefreshCount) window.__practiceTasksRefreshCount();
   }
 
   function markCardDisconnect(card, btn) {
     btn.disabled = false;
-    btn.textContent = "完成";
+    btn.textContent = "CLAIM";
     btn.classList.remove("is-waiting");
     showToast("连接已断开，请刷新后重试", true);
+    if (window.__practiceTasksRefreshCount) window.__practiceTasksRefreshCount();
   }
 
   function newRequestId() {
@@ -223,54 +227,53 @@
 
   connectWs();
 
-  list.querySelectorAll(".task-confirm-card").forEach(function (card) {
-    var btn = card.querySelector(".task-complete-btn");
-    var titleEl = card.querySelector(".task-confirm-title");
-    if (!btn || !titleEl) return;
+  list.addEventListener("click", function (ev) {
+    var btn = ev.target.closest(".practice-task-claim");
+    if (!btn || !list.contains(btn)) return;
+    var card = btn.closest(".practice-task-card");
+    var titleEl = card && card.querySelector(".practice-task-title");
+    if (!card || !titleEl) return;
+    if (btn.disabled || btn.classList.contains("is-done")) return;
+    if (!wsReady || !ws || ws.readyState !== WebSocket.OPEN) {
+      showToast("信令未连接，请稍候或刷新页面", true);
+      return;
+    }
 
-    btn.addEventListener("click", function () {
-      if (btn.disabled || btn.classList.contains("is-done")) return;
-      if (!wsReady || !ws || ws.readyState !== WebSocket.OPEN) {
-        showToast("信令未连接，请稍候或刷新页面", true);
-        return;
-      }
+    btn.classList.add("is-waiting");
+    btn.textContent = "等待确认…";
+    btn.disabled = true;
 
-      btn.classList.add("is-waiting");
-      btn.textContent = "等待确认…";
-      btn.disabled = true;
+    var title = titleEl.textContent.trim();
+    var requestId = newRequestId();
+    var taskId = card.getAttribute("data-task-id") || "";
 
-      var title = titleEl.textContent.trim();
-      var requestId = newRequestId();
-      var taskId = card.getAttribute("data-task-id") || "";
-
-      waiterByRequestId[requestId] = {
-        timeoutId: setTimeout(function () {
-          clearWaiter(requestId, function (c, b) {
-            markCardTimeout(c, b);
-          });
-        }, 120000),
-        card: card,
-        btn: btn,
-      };
-
-      try {
-        ws.send(
-          JSON.stringify({
-            type: "task_complete_request",
-            requestId: requestId,
-            taskId: taskId,
-            title: title,
-          })
-        );
-        showToast("已通知对方，等待确认…", false);
-      } catch (e) {
+    waiterByRequestId[requestId] = {
+      timeoutId: setTimeout(function () {
         clearWaiter(requestId, function (c, b) {
-          b.disabled = false;
-          b.textContent = "完成";
-          b.classList.remove("is-waiting");
+          markCardTimeout(c, b);
         });
-        showToast("发送失败，请重试", true);
-      }
-    });
+      }, 120000),
+      card: card,
+      btn: btn,
+    };
+
+    try {
+      ws.send(
+        JSON.stringify({
+          type: "task_complete_request",
+          requestId: requestId,
+          taskId: taskId,
+          title: title,
+        })
+      );
+      showToast("已通知对方，等待确认…", false);
+    } catch (e) {
+      clearWaiter(requestId, function (c, b) {
+        b.disabled = false;
+        b.textContent = "CLAIM";
+        b.classList.remove("is-waiting");
+      });
+      showToast("发送失败，请重试", true);
+    }
   });
 })();

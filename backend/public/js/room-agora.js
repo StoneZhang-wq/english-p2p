@@ -13,6 +13,8 @@
     camOn: false,
     channelPollTimer: null,
     waitUiTimer: null,
+    deferJoinTimer: null,
+    deferJoinBackupTimer: null,
     lastJoinedChannel: null,
     timeslotBookMode: false,
     timeslotId: null,
@@ -38,6 +40,17 @@
     if (!/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}/.test(iso)) return null;
     var d = new Date(iso + "+08:00");
     return Number.isNaN(d.getTime()) ? null : d.getTime();
+  }
+
+  function clearDeferJoinTimers() {
+    if (state.deferJoinTimer) {
+      clearTimeout(state.deferJoinTimer);
+      state.deferJoinTimer = null;
+    }
+    if (state.deferJoinBackupTimer) {
+      clearInterval(state.deferJoinBackupTimer);
+      state.deferJoinBackupTimer = null;
+    }
   }
 
   function hideWaitFlowUi() {
@@ -344,11 +357,106 @@
   async function leaveChannel() {
     closeMatchTipsSheet();
     hideWaitFlowUi();
+    clearDeferJoinTimers();
     if (state.channelPollTimer) {
       clearInterval(state.channelPollTimer);
       state.channelPollTimer = null;
     }
     await leaveMediaAndClient();
+  }
+
+  function startChannelPollTimer(areaToken) {
+    if (state.channelPollTimer || !state.timeslotId) return;
+    state.channelPollTimer = setInterval(async function () {
+      if (!state.timeslotId || !state.joined) return;
+      try {
+        var next = await fetchRtcTokenBooking(state.timeslotId);
+        if (!next) return;
+        state.lastRtcMode = next.rtcMode || state.lastRtcMode;
+        if (state.slotStartMs == null && next.startTime) {
+          state.slotStartMs = parseShanghaiStartMs(next.startTime);
+        }
+        if (state.slotEndMs == null && next.endTime) {
+          state.slotEndMs = parseShanghaiStartMs(next.endTime);
+        }
+        updateMatchCtaVisibility();
+        if (!next || next.channelName === state.lastJoinedChannel) return;
+        showRoomToast("已切换至语伴专属频道", false);
+        await leaveMediaAndClient();
+        state.lastJoinedChannel = next.channelName;
+        setPartnerLabel("搭档（连接中…）");
+        var ok2 = await createJoinPublish(next, areaToken);
+        if (ok2) {
+          state.lastJoinedChannel = next.channelName;
+          state.lastRtcMode = next.rtcMode || "paired";
+          hideWaitFlowUi();
+          closeMatchTipsSheet();
+        }
+      } catch (e) {
+        console.warn("timeslot channel poll", e);
+      }
+    }, 20000);
+  }
+
+  function scheduleDeferredWaitingJoin(areaToken) {
+    clearDeferJoinTimers();
+    var delay = 0;
+    if (state.slotStartMs) {
+      delay = Math.max(0, state.slotStartMs - Date.now());
+    }
+    state.deferJoinTimer = setTimeout(function () {
+      attemptFirstTimeslotJoin(areaToken).catch(function (e) {
+        console.warn("defer join", e);
+      });
+    }, delay);
+    state.deferJoinBackupTimer = setInterval(function () {
+      if (!state.timeslotBookMode || state.joined) {
+        clearDeferJoinTimers();
+        return;
+      }
+      if (state.slotStartMs && Date.now() >= state.slotStartMs && state.lastRtcMode === "waiting") {
+        attemptFirstTimeslotJoin(areaToken).catch(function (e) {
+          console.warn("defer join backup", e);
+        });
+      }
+    }, 4000);
+  }
+
+  async function attemptFirstTimeslotJoin(areaToken) {
+    if (!state.timeslotId || state.joined) {
+      clearDeferJoinTimers();
+      return;
+    }
+    var cred = await fetchRtcTokenBooking(state.timeslotId);
+    state.lastRtcMode = cred.rtcMode || state.lastRtcMode;
+    if (cred.startTime) {
+      state.slotStartMs = state.slotStartMs || parseShanghaiStartMs(cred.startTime);
+    }
+    if (cred.endTime) {
+      state.slotEndMs = state.slotEndMs || parseShanghaiStartMs(cred.endTime);
+    }
+    updateMatchCtaVisibility();
+
+    if (cred.rtcMode === "waiting" && state.slotStartMs && Date.now() < state.slotStartMs) {
+      return;
+    }
+
+    clearDeferJoinTimers();
+
+    var ok = await createJoinPublish(cred, areaToken);
+    if (!ok) return;
+
+    state.lastJoinedChannel = cred.channelName;
+    if (cred.rtcMode === "waiting") {
+      showRoomToast("已加入同场等待大厅；配对完成后将自动切换语伴频道", false);
+      setPartnerLabel("同场练习者（等待大厅）");
+    } else {
+      showRoomToast("已进入语伴专属频道", false);
+      setPartnerLabel("搭档（连接中…）");
+      hideWaitFlowUi();
+      closeMatchTipsSheet();
+    }
+    startChannelPollTimer(areaToken);
   }
 
   async function run() {
@@ -383,11 +491,12 @@
         state.timeslotBookMode = true;
         state.timeslotId = tid;
         state.savedAreaToken = areaToken;
-        setPartnerLabel("连接中…");
         cred = await fetchRtcTokenBooking(tid);
         state.lastRtcMode = cred.rtcMode || null;
+        state.slotStartMs = parseShanghaiStartMs(cred.startTime);
+        state.slotEndMs = parseShanghaiStartMs(cred.endTime);
         if (cred.rtcMode === "waiting") {
-          setPartnerLabel("同场练习者（等待大厅）");
+          setPartnerLabel("开场后到点将连接语音");
         } else {
           setPartnerLabel("搭档（连接中…）");
         }
@@ -405,57 +514,43 @@
       return;
     }
 
-    var ok = await createJoinPublish(cred, areaToken);
-    if (!ok) return;
+    var joinedNow = false;
+    var deferredWaiting = false;
 
-    state.lastJoinedChannel = cred.channelName;
-
-    if (cred.rtcMode === "waiting") {
-      showRoomToast("已加入同场等待大厅；开场到点后将自动配对，并切换语伴专属频道", false);
-    } else if (state.timeslotBookMode) {
-      showRoomToast("已进入语伴专属频道", false);
-    } else {
+    if (!state.timeslotBookMode) {
+      joinedNow = await createJoinPublish(cred, areaToken);
+      if (!joinedNow) return;
+      state.lastJoinedChannel = cred.channelName;
       showRoomToast("已加入频道，等待语伴…", false);
-    }
-
-    if (state.timeslotBookMode) {
-      if (cred.rtcMode === "waiting") {
-        showWaitFlowForBooking(cred);
+    } else if (cred.rtcMode === "paired") {
+      hideWaitFlowUi();
+      joinedNow = await createJoinPublish(cred, areaToken);
+      if (!joinedNow) return;
+      state.lastJoinedChannel = cred.channelName;
+      showRoomToast("已进入语伴专属频道", false);
+      startChannelPollTimer(areaToken);
+    } else if (cred.rtcMode === "waiting") {
+      showWaitFlowForBooking(cred);
+      if (state.slotStartMs && Date.now() < state.slotStartMs) {
+        deferredWaiting = true;
+        showRoomToast("练习间已就绪；到达开场时间后将自动连接语音", false);
+        scheduleDeferredWaitingJoin(areaToken);
       } else {
-        hideWaitFlowUi();
+        joinedNow = await createJoinPublish(cred, areaToken);
+        if (!joinedNow) return;
+        state.lastJoinedChannel = cred.channelName;
+        showRoomToast("已加入同场等待大厅；配对完成后将自动切换语伴频道", false);
+        setPartnerLabel("同场练习者（等待大厅）");
+        startChannelPollTimer(areaToken);
       }
     }
 
-    if (state.timeslotBookMode && state.timeslotId) {
-      state.channelPollTimer = setInterval(async function () {
-        if (!state.timeslotId) return;
-        try {
-          var next = await fetchRtcTokenBooking(state.timeslotId);
-          if (!next) return;
-          state.lastRtcMode = next.rtcMode || state.lastRtcMode;
-          if (state.slotStartMs == null && next.startTime) {
-            state.slotStartMs = parseShanghaiStartMs(next.startTime);
-          }
-          if (state.slotEndMs == null && next.endTime) {
-            state.slotEndMs = parseShanghaiStartMs(next.endTime);
-          }
-          updateMatchCtaVisibility();
-          if (!next || next.channelName === state.lastJoinedChannel) return;
-          showRoomToast("已切换至语伴专属频道", false);
-          await leaveMediaAndClient();
-          state.lastJoinedChannel = next.channelName;
-          setPartnerLabel("搭档（连接中…）");
-          var ok2 = await createJoinPublish(next, state.savedAreaToken);
-          if (ok2) {
-            state.lastJoinedChannel = next.channelName;
-            state.lastRtcMode = next.rtcMode || "paired";
-            hideWaitFlowUi();
-            closeMatchTipsSheet();
-          }
-        } catch (e) {
-          console.warn("timeslot channel poll", e);
-        }
-      }, 20000);
+    if (joinedNow && state.timeslotBookMode && cred.rtcMode === "paired") {
+      hideWaitFlowUi();
+    }
+
+    if (!joinedNow && !deferredWaiting && state.timeslotBookMode) {
+      return;
     }
   }
 

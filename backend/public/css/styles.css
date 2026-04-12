@@ -1357,26 +1357,80 @@ img {
   height: 24px;
 }
 
-/* —— 任务确认 UI（设计稿：顶栏任务卡 + 中部通话区 + 底栏控制） —— */
-.task-room-role {
-  margin: 0 0 12px;
+/* —— 练习任务区（TASKS + 常用句 + CLAIM，与房间底栏控制配套） —— */
+.room-tasks-panel {
+  margin: 0 0 16px;
+}
+
+.room-tasks-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 12px;
+}
+
+.room-tasks-heading {
+  margin: 0;
   font-size: 0.8125rem;
+  font-weight: 700;
+  color: #f1f5f9;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+
+.room-tasks-count {
   font-weight: 600;
   color: #94a3b8;
   letter-spacing: 0.02em;
 }
 
-.task-confirm-list {
+.room-tasks-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.room-tasks-icon-btn {
+  width: 40px;
+  height: 40px;
+  padding: 0;
+  border: 1px solid var(--room-border);
+  border-radius: 10px;
+  background: rgba(255, 255, 255, 0.04);
+  color: #cbd5e1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+}
+
+.room-tasks-icon-btn:active {
+  transform: scale(0.96);
+}
+
+.room-tasks-simulate {
+  padding: 8px 12px;
+  border-radius: 10px;
+  border: 1px solid rgba(37, 99, 235, 0.45);
+  background: transparent;
+  color: #60a5fa;
+  font-size: 0.75rem;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.room-tasks-simulate:active {
+  transform: scale(0.98);
+}
+
+.practice-task-list {
   list-style: none;
-  margin: 0 0 16px;
+  margin: 0;
   padding: 0;
 }
 
-.task-confirm-card {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 12px;
+.practice-task-card {
   padding: 14px 16px;
   margin-bottom: 10px;
   background: var(--room-surface);
@@ -1384,40 +1438,85 @@ img {
   border-radius: var(--radius-card);
 }
 
-.task-confirm-card:last-child {
+.practice-task-card:last-child {
   margin-bottom: 0;
 }
 
-.task-confirm-card.is-done {
-  opacity: 0.65;
+.practice-task-card.is-done {
+  opacity: 0.72;
   border-color: rgba(34, 197, 94, 0.35);
 }
 
-.task-confirm-main {
-  flex: 1;
-  min-width: 0;
+.practice-task-row {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
 }
 
-.task-confirm-title {
-  margin: 0 0 6px;
+.practice-task-title {
+  margin: 0;
+  flex: 1;
+  min-width: 0;
   font-size: 0.9375rem;
   font-weight: 600;
   color: #f8fafc;
   line-height: 1.35;
 }
 
-.task-confirm-reward {
-  display: flex;
-  align-items: center;
-  gap: 4px;
-  font-size: 0.8125rem;
-  font-weight: 700;
-  color: var(--task-energy);
+.practice-task-claim {
+  flex-shrink: 0;
+  min-height: 40px;
+  padding: 0 16px;
 }
 
-.task-confirm-reward .ico {
-  font-size: 1rem;
-  line-height: 1;
+.practice-task-hints {
+  margin-top: 12px;
+  padding-top: 10px;
+  border-top: 1px solid var(--room-border);
+}
+
+.practice-task-hints-toggle {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  padding: 4px 0 8px;
+  border: none;
+  background: none;
+  color: #94a3b8;
+  font-size: 0.6875rem;
+  font-weight: 700;
+  letter-spacing: 0.05em;
+  cursor: pointer;
+  text-align: left;
+}
+
+.practice-task-hints-chev {
+  color: #64748b;
+  font-size: 0.625rem;
+}
+
+.practice-task-hints:not(.is-open) .practice-task-hints-body {
+  display: none;
+}
+
+.practice-task-hints.is-open .practice-task-hints-body {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.practice-hint-line {
+  margin: 0;
+  padding: 10px 12px;
+  border-radius: 10px;
+  background: rgba(0, 0, 0, 0.25);
+  border: 1px solid var(--room-border);
+  font-size: 0.8125rem;
+  color: #e2e8f0;
+  line-height: 1.45;
 }
 
 .task-complete-btn {
