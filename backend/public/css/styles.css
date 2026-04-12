@@ -124,6 +124,118 @@ img {
   display: none !important;
 }
 
+/* 预约进房：开场前状态 + 到点后「匹配」按钮 + 提示词层 */
+.room-wait-flow {
+  margin: 0 0 14px;
+  padding: 12px 14px;
+  border-radius: 12px;
+  background: rgba(30, 41, 59, 0.92);
+  border: 1px solid var(--room-border, #334155);
+}
+
+.room-wait-flow[hidden] {
+  display: none !important;
+}
+
+.room-wait-flow__status {
+  margin: 0 0 10px;
+  font-size: 0.875rem;
+  line-height: 1.55;
+  color: #e2e8f0;
+}
+
+.room-wait-flow__cta {
+  display: block;
+  width: 100%;
+  padding: 12px 14px;
+  border: none;
+  border-radius: 10px;
+  background: linear-gradient(180deg, #3b82f6 0%, #2563eb 100%);
+  color: #fff;
+  font-size: 0.9375rem;
+  font-weight: 600;
+  text-align: center;
+  cursor: pointer;
+  box-shadow: 0 2px 10px rgba(37, 99, 235, 0.35);
+}
+
+.room-wait-flow__cta:active {
+  transform: scale(0.99);
+}
+
+.room-wait-flow__cta[hidden] {
+  display: none !important;
+}
+
+.room-tips-sheet {
+  position: fixed;
+  inset: 0;
+  z-index: 210;
+  display: flex;
+  align-items: flex-end;
+  justify-content: center;
+  padding: 16px;
+  padding-bottom: max(16px, var(--safe-bottom));
+}
+
+.room-tips-sheet[hidden] {
+  display: none !important;
+}
+
+.room-tips-sheet__backdrop {
+  position: absolute;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.5);
+}
+
+.room-tips-sheet__panel {
+  position: relative;
+  width: 100%;
+  max-width: 440px;
+  max-height: 70vh;
+  overflow: auto;
+  padding: 18px 16px 16px;
+  border-radius: 16px 16px 12px 12px;
+  background: #1e293b;
+  border: 1px solid #334155;
+  box-shadow: 0 -8px 40px rgba(0, 0, 0, 0.35);
+}
+
+.room-tips-sheet__title {
+  margin: 0 0 12px;
+  font-size: 1rem;
+  font-weight: 700;
+  color: #f8fafc;
+}
+
+.room-tips-sheet__list {
+  margin: 0 0 16px;
+  padding-left: 1.1rem;
+  font-size: 0.875rem;
+  line-height: 1.65;
+  color: #cbd5e1;
+}
+
+.room-tips-sheet__list li {
+  margin-bottom: 10px;
+}
+
+.room-tips-sheet__list li:last-child {
+  margin-bottom: 0;
+}
+
+.room-tips-sheet__close {
+  width: 100%;
+  padding: 12px;
+  border: none;
+  border-radius: 10px;
+  background: #334155;
+  color: #f1f5f9;
+  font-size: 0.9375rem;
+  font-weight: 600;
+  cursor: pointer;
+}
+
 /* 对方确认条（非模态，贴底栏上方） */
 .partner-confirm-bar {
   position: fixed;

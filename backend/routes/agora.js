@@ -40,6 +40,14 @@ router.post("/rtc-token-booking", requireAuth, async (req, res) => {
     const channelName = paired ? paired.channel_name : waitingChannelForTimeslot(tid);
     const rtcMode = paired ? "paired" : "waiting";
 
+    const { rows: slotRows } = await pool.query(
+      `SELECT to_char(t.start_time, 'YYYY-MM-DD HH24:MI:SS') AS start_time,
+              to_char(t.end_time, 'YYYY-MM-DD HH24:MI:SS') AS end_time
+       FROM timeslots t WHERE t.id = $1 LIMIT 1`,
+      [tid]
+    );
+    const slot = slotRows[0] || {};
+
     const result = buildRtcToken(channelName, uid);
     res.json({
       code: 0,
@@ -52,6 +60,8 @@ router.post("/rtc-token-booking", requireAuth, async (req, res) => {
         expiresIn: result.expiresIn,
         rtcMode,
         timeslotId: tid,
+        startTime: slot.start_time || null,
+        endTime: slot.end_time || null,
       },
     });
   } catch (e) {

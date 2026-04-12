@@ -12,11 +12,120 @@
     micOn: true,
     camOn: false,
     channelPollTimer: null,
+    waitUiTimer: null,
     lastJoinedChannel: null,
     timeslotBookMode: false,
     timeslotId: null,
     savedAreaToken: null,
+    slotStartMs: null,
+    slotEndMs: null,
+    lastRtcMode: null,
+    waitUiWired: false,
   };
+
+  var MATCH_TIPS_HTML = [
+    "系统将参考你在预约时选择的<strong>口语水平</strong>，为你匹配语伴（通常与同级或相邻一级配对）。",
+    "匹配由服务端自动完成，请<strong>保持本页打开</strong>；配对成功后会自动切换至语伴专属频道。",
+    "若等待较久，可检查网络；也可返回「我的预约」查看是否已显示「已配对」。",
+    "练习开始后请尽量<strong>全程使用英语</strong>交流；下方可开关麦克风与摄像头。",
+  ];
+
+  function parseShanghaiStartMs(s) {
+    if (!s) return null;
+    var str = String(s).trim();
+    var iso = str.replace(" ", "T");
+    if (/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}$/.test(iso)) iso += ":00";
+    if (!/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}/.test(iso)) return null;
+    var d = new Date(iso + "+08:00");
+    return Number.isNaN(d.getTime()) ? null : d.getTime();
+  }
+
+  function hideWaitFlowUi() {
+    var flow = document.getElementById("roomWaitFlow");
+    if (flow) flow.hidden = true;
+    var btn = document.getElementById("roomWaitMatchBtn");
+    if (btn) btn.hidden = true;
+    if (state.waitUiTimer) {
+      clearInterval(state.waitUiTimer);
+      state.waitUiTimer = null;
+    }
+  }
+
+  function closeMatchTipsSheet() {
+    var sheet = document.getElementById("roomMatchTipsSheet");
+    if (sheet) {
+      sheet.hidden = true;
+      sheet.setAttribute("aria-hidden", "true");
+    }
+  }
+
+  function openMatchTipsSheet() {
+    var list = document.getElementById("roomMatchTipsList");
+    var sheet = document.getElementById("roomMatchTipsSheet");
+    if (!list || !sheet) return;
+    list.innerHTML = "";
+    MATCH_TIPS_HTML.forEach(function (html) {
+      var li = document.createElement("li");
+      li.innerHTML = html;
+      list.appendChild(li);
+    });
+    sheet.hidden = false;
+    sheet.setAttribute("aria-hidden", "false");
+  }
+
+  function updateMatchCtaVisibility() {
+    var flow = document.getElementById("roomWaitFlow");
+    var btn = document.getElementById("roomWaitMatchBtn");
+    if (!flow || flow.hidden || !btn) return;
+    if (state.lastRtcMode !== "waiting" || !state.slotStartMs) {
+      btn.hidden = true;
+      return;
+    }
+    btn.hidden = Date.now() < state.slotStartMs;
+  }
+
+  function wireRoomWaitUiOnce() {
+    if (state.waitUiWired) return;
+    state.waitUiWired = true;
+    var btn = document.getElementById("roomWaitMatchBtn");
+    var closeBtn = document.getElementById("roomMatchTipsClose");
+    var backdrop = document.getElementById("roomMatchTipsBackdrop");
+    if (btn) {
+      btn.addEventListener("click", function () {
+        openMatchTipsSheet();
+      });
+    }
+    if (closeBtn) {
+      closeBtn.addEventListener("click", function () {
+        closeMatchTipsSheet();
+      });
+    }
+    if (backdrop) {
+      backdrop.addEventListener("click", function () {
+        closeMatchTipsSheet();
+      });
+    }
+  }
+
+  function showWaitFlowForBooking(cred) {
+    wireRoomWaitUiOnce();
+    var flow = document.getElementById("roomWaitFlow");
+    var statusEl = document.getElementById("roomWaitStatus");
+    if (!flow || !statusEl) return;
+    if (cred.rtcMode !== "waiting") {
+      hideWaitFlowUi();
+      return;
+    }
+    statusEl.textContent = "练习间已就绪，开场后将为你分配语伴";
+    flow.hidden = false;
+    state.slotStartMs = parseShanghaiStartMs(cred.startTime);
+    state.slotEndMs = parseShanghaiStartMs(cred.endTime);
+    state.lastRtcMode = cred.rtcMode || "waiting";
+    updateMatchCtaVisibility();
+    if (!state.waitUiTimer) {
+      state.waitUiTimer = setInterval(updateMatchCtaVisibility, 2000);
+    }
+  }
 
   function apiBase() {
     var raw = document.body.getAttribute("data-api-base");
@@ -233,6 +342,8 @@
   }
 
   async function leaveChannel() {
+    closeMatchTipsSheet();
+    hideWaitFlowUi();
     if (state.channelPollTimer) {
       clearInterval(state.channelPollTimer);
       state.channelPollTimer = null;
@@ -274,6 +385,7 @@
         state.savedAreaToken = areaToken;
         setPartnerLabel("连接中…");
         cred = await fetchRtcTokenBooking(tid);
+        state.lastRtcMode = cred.rtcMode || null;
         if (cred.rtcMode === "waiting") {
           setPartnerLabel("同场练习者（等待大厅）");
         } else {
@@ -306,11 +418,28 @@
       showRoomToast("已加入频道，等待语伴…", false);
     }
 
+    if (state.timeslotBookMode) {
+      if (cred.rtcMode === "waiting") {
+        showWaitFlowForBooking(cred);
+      } else {
+        hideWaitFlowUi();
+      }
+    }
+
     if (state.timeslotBookMode && state.timeslotId) {
       state.channelPollTimer = setInterval(async function () {
         if (!state.timeslotId) return;
         try {
           var next = await fetchRtcTokenBooking(state.timeslotId);
+          if (!next) return;
+          state.lastRtcMode = next.rtcMode || state.lastRtcMode;
+          if (state.slotStartMs == null && next.startTime) {
+            state.slotStartMs = parseShanghaiStartMs(next.startTime);
+          }
+          if (state.slotEndMs == null && next.endTime) {
+            state.slotEndMs = parseShanghaiStartMs(next.endTime);
+          }
+          updateMatchCtaVisibility();
           if (!next || next.channelName === state.lastJoinedChannel) return;
           showRoomToast("已切换至语伴专属频道", false);
           await leaveMediaAndClient();
@@ -319,6 +448,9 @@
           var ok2 = await createJoinPublish(next, state.savedAreaToken);
           if (ok2) {
             state.lastJoinedChannel = next.channelName;
+            state.lastRtcMode = next.rtcMode || "paired";
+            hideWaitFlowUi();
+            closeMatchTipsSheet();
           }
         } catch (e) {
           console.warn("timeslot channel poll", e);

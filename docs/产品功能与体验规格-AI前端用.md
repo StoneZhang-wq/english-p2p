@@ -197,7 +197,7 @@
 3. 首页主题列表（可先写死或接 DB 扩展）。  
 4. 预约页：`GET /api/themes/by-id` 渲染头图与场景 → `timeslots?theme_id=` 选档 → `POST /bookings`。  
 5. 我的预约：`GET /api/bookings/mine` + 状态文案 + 进房（无 `channelName` 时置灰）+ `DELETE /api/cancel-booking/:id` 取消（二次确认）。  
-6. 房间页：展示 + `rtc-token-booking`（`timeslot_id`）或演示 `rtc-token` + 加入频道 + 麦克风（可选摄像头）+ iOS 横幅。  
+6. 房间页：展示 + `rtc-token-booking`（`timeslot_id`）或演示 `rtc-token` + 加入频道 + 麦克风（可选摄像头）+ iOS 横幅；**等待大厅**时顶区展示「练习间已就绪…」、到 `startTime` 后显示「已到练习时间…」按钮，点击展开**匹配提示**文案层。  
 7. 结束双确认、信用分展示（待后端接口落地后对接）。
 
 ---

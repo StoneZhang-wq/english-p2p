@@ -168,7 +168,7 @@ CREATE TABLE credit_logs (
 | POST | `/api/end-conversation` | Body：`pair_id`, `duration_seconds` 等；用于结算与信用分 |
 | GET | `/api/user/profile` | 昵称、信用分等 |
 | POST | `/api/agora/rtc-token` | Body：`{ channelName, uid }`；返回 `appId`、`channelName`、`token`、`uid`、`expiresIn`。**须开启声网 App Certificate**；**演示/联调用**，不校验预约（与 `rtc-token-booking` 区分） |
-| POST | `/api/agora/rtc-token-booking` | **须登录**。Body：`{ timeslot_id }`；校验当前用户在该场次有 `confirmed` 预约；若已存在包含本人的 `pairs` 则返回该 **1v1** `channel_name`，否则返回**同场等待大厅**频道名 `engw{timeslotId}`（`utils/agoraChannelNames.js`）；`uid` 取用户 id（须满足声网 uint32） |
+| POST | `/api/agora/rtc-token-booking` | **须登录**。Body：`{ timeslot_id }`；校验当前用户在该场次有 `confirmed` 预约；若已存在包含本人的 `pairs` 则返回该 **1v1** `channel_name`，否则返回**同场等待大厅**频道名 `engw{timeslotId}`（`utils/agoraChannelNames.js`）；`uid` 取用户 id（须满足声网 uint32）；响应另含 **`startTime` / `endTime`**（`to_char` 上海 naive 字符串）与 **`rtcMode`**：`waiting` \| `paired`，供房间页开场文案与「匹配提示」按钮 |
 
 **开发调试（非正式配对）**：当 `NODE_ENV !== 'production'` **或** `ENABLE_DEV_PAIRING=1` 时挂载 `routes/devPairing.js`（否则不注册该路径）：
 
