@@ -23,6 +23,7 @@
     slotEndMs: null,
     lastRtcMode: null,
     waitUiWired: false,
+    isSandbox: false,
   };
 
   var MATCH_TIPS_HTML = [
@@ -428,6 +429,7 @@
       return;
     }
     var cred = await fetchRtcTokenBooking(state.timeslotId);
+    state.isSandbox = !!cred.isSandbox;
     state.lastRtcMode = cred.rtcMode || state.lastRtcMode;
     if (cred.startTime) {
       state.slotStartMs = state.slotStartMs || parseShanghaiStartMs(cred.startTime);
@@ -437,7 +439,7 @@
     }
     updateMatchCtaVisibility();
 
-    if (cred.rtcMode === "waiting" && state.slotStartMs && Date.now() < state.slotStartMs) {
+    if (cred.rtcMode === "waiting" && state.slotStartMs && Date.now() < state.slotStartMs && !cred.isSandbox) {
       return;
     }
 
@@ -493,10 +495,11 @@
         state.savedAreaToken = areaToken;
         cred = await fetchRtcTokenBooking(tid);
         state.lastRtcMode = cred.rtcMode || null;
+        state.isSandbox = !!cred.isSandbox;
         state.slotStartMs = parseShanghaiStartMs(cred.startTime);
         state.slotEndMs = parseShanghaiStartMs(cred.endTime);
         if (cred.rtcMode === "waiting") {
-          setPartnerLabel("开场后到点将连接语音");
+          setPartnerLabel(state.isSandbox ? "沙箱：将直接连接等待大厅" : "开场后到点将连接语音");
         } else {
           setPartnerLabel("搭档（连接中…）");
         }
@@ -530,18 +533,28 @@
       showRoomToast("已进入语伴专属频道", false);
       startChannelPollTimer(areaToken);
     } else if (cred.rtcMode === "waiting") {
-      showWaitFlowForBooking(cred);
-      if (state.slotStartMs && Date.now() < state.slotStartMs) {
-        deferredWaiting = true;
-        showRoomToast("练习间已就绪；到达开场时间后将自动连接语音", false);
-        scheduleDeferredWaitingJoin(areaToken);
-      } else {
+      if (cred.isSandbox) {
+        hideWaitFlowUi();
         joinedNow = await createJoinPublish(cred, areaToken);
         if (!joinedNow) return;
         state.lastJoinedChannel = cred.channelName;
-        showRoomToast("已加入同场等待大厅；配对完成后将自动切换语伴频道", false);
+        showRoomToast("沙箱：已加入等待大厅（可随时用 dev 配对进 1v1）", false);
         setPartnerLabel("同场练习者（等待大厅）");
         startChannelPollTimer(areaToken);
+      } else {
+        showWaitFlowForBooking(cred);
+        if (state.slotStartMs && Date.now() < state.slotStartMs) {
+          deferredWaiting = true;
+          showRoomToast("练习间已就绪；到达开场时间后将自动连接语音", false);
+          scheduleDeferredWaitingJoin(areaToken);
+        } else {
+          joinedNow = await createJoinPublish(cred, areaToken);
+          if (!joinedNow) return;
+          state.lastJoinedChannel = cred.channelName;
+          showRoomToast("已加入同场等待大厅；配对完成后将自动切换语伴频道", false);
+          setPartnerLabel("同场练习者（等待大厅）");
+          startChannelPollTimer(areaToken);
+        }
       }
     }
 

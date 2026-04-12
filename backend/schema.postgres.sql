@@ -25,7 +25,8 @@ CREATE TABLE IF NOT EXISTS themes (
   scene_text TEXT,
   roles_json TEXT,
   cover_url TEXT,
-  preview_markdown TEXT
+  preview_markdown TEXT,
+  is_sandbox BOOLEAN NOT NULL DEFAULT FALSE
 );
 
 -- 注意：idx_themes_week_slot 仅在 `backend/db.js` 的 migrateWeeklyThemesColumns 中创建，

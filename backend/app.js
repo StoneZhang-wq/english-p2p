@@ -19,6 +19,10 @@ function isDevPairingApiEnabled() {
   return process.env.ENABLE_DEV_PAIRING === "1" || process.env.NODE_ENV !== "production";
 }
 
+function isSandboxLabApiEnabled() {
+  return process.env.ENABLE_SANDBOX_LAB === "1" || process.env.NODE_ENV !== "production";
+}
+
 const app = express();
 app.set("trust proxy", 1);
 const PORT = Number(process.env.PORT) || 3000;
@@ -62,6 +66,13 @@ if (isDevPairingApiEnabled()) {
   app.use("/api/dev", require("./routes/devPairing"));
   console.warn(
     "[dev] POST /api/dev/pair-timeslot 已启用（NODE_ENV 非 production 或 ENABLE_DEV_PAIRING=1）。生产环境请勿开启调试开关。"
+  );
+}
+
+if (isSandboxLabApiEnabled()) {
+  app.use("/api/dev", require("./routes/devSandbox"));
+  console.warn(
+    "[sandbox] GET /api/dev/sandbox-lab、POST /api/dev/sandbox-slot/refresh 已启用（NODE_ENV 非 production 或 ENABLE_SANDBOX_LAB=1）。"
   );
 }
 

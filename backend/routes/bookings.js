@@ -13,6 +13,16 @@ const LEVEL_MAP = {
 
 const ALLOWED_LEVELS = new Set(["beginner", "intermediate", "advanced"]);
 
+function parseShanghaiStartForBooking(sqlStr) {
+  if (!sqlStr) return null;
+  const str = String(sqlStr).trim();
+  let iso = str.replace(" ", "T");
+  if (/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}$/.test(iso)) iso += ":00";
+  if (!/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}/.test(iso)) return null;
+  const d = new Date(`${iso}+08:00`);
+  return Number.isNaN(d.getTime()) ? null : d;
+}
+
 router.post("/", requireAuth, async (req, res) => {
   const timeslotId = Number(req.body?.timeslot_id);
   const rawLevel = String(req.body?.level || "").trim();
@@ -23,7 +33,30 @@ router.post("/", requireAuth, async (req, res) => {
   }
 
   try {
-    await bookTimeslot(getPool(), req.user.id, timeslotId, level);
+    const pool = getPool();
+    const { rows: pre } = await pool.query(
+      `SELECT to_char(ts.start_time, 'YYYY-MM-DD HH24:MI:SS') AS start_time,
+              COALESCE(th.is_sandbox, FALSE) AS is_sandbox
+       FROM timeslots ts
+       JOIN themes th ON th.id = ts.theme_id
+       WHERE ts.id = $1 AND ts.status = 'open'`,
+      [timeslotId]
+    );
+    if (!pre[0]) {
+      return res.status(404).json({ code: 404, message: "场次不存在", data: null });
+    }
+    if (!pre[0].is_sandbox) {
+      const startAt = parseShanghaiStartForBooking(pre[0].start_time);
+      if (startAt && startAt.getTime() - Date.now() < 60 * 60 * 1000) {
+        return res.status(409).json({
+          code: 409,
+          message: "距离开场不足 60 分钟，已停止该场次新预约",
+          data: null,
+        });
+      }
+    }
+
+    await bookTimeslot(pool, req.user.id, timeslotId, level);
     res.json({ code: 0, message: "ok", data: null });
   } catch (e) {
     const map = {

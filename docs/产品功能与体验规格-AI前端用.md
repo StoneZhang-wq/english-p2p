@@ -110,11 +110,16 @@
 | 对方爽约或对方违规早退 | **守约方 +1** |
 | 因平台无法全员配对而取消场次 | **不扣用户分**；补偿每位 **+2**（防重复发放由后端保证） |
 
+### 5.6 沙箱实验室与 LLM（对齐说明）
+
+- **沙箱实验室**（`docs/产品描述.md` 第 5.6 节）：`dev-lab.html` + **`GET /api/dev/sandbox-lab`** / **`POST /api/dev/sandbox-slot/refresh`**（须登录刷新）；`theme_id`/`timeslot_id` 由接口返回；预约 UI **不受**「开场前 60 分钟停新约」限制；两名测试用户预约后可在开发环境调用 **`POST /api/dev/pair-timeslot`** 写入 `pairs` 再进 `room.html?timeslot_id=`。细节见 `ARCHITECTURE.md` 第 6.7 节。  
+- **豆包 / LLM**（`docs/产品描述.md` 第 8.3 节）：**规划**中；主题文案、预习、房间任务 JSON 等拟由**服务端**调用豆包生成并落库；前端不持有 LLM API Key。见 `ARCHITECTURE.md` 第 6.8 节。
+
 ---
 
 ## 6. 主题与任务卡（产品）
 
-- **主题**：MVP 为 **5～10 个固定主题**，由运营/后台维护；前端拉列表展示（当前仓库有种子数据 + 首页写死入口时可过渡）。  
+- **主题**：MVP 为 **5～10 个固定主题**，由运营/后台维护；前端拉列表展示（当前仓库有种子数据 + 首页写死入口时可过渡）。**规划**：服务端 **豆包** 等 LLM 辅助生成/润色主题与预习后写入 `themes`（见第 5.6 节与 `ARCHITECTURE` 6.8）。  
 - **任务卡**：可由 LLM 生成；**同一主题 MVP 共用一套任务卡**；房间内展示**双方角色与信息差**。  
 - **迭代**：可按水平生成不同难度任务卡（后期）。
 
@@ -122,7 +127,7 @@
 
 ## 7. 信息架构（页面清单）
 
-以下为**用户主路径**；调试页不计入产品。
+以下为**用户主路径**；调试页、**沙箱实验室**（规划，见第 5.6 节）不计入产品主路径。
 
 | 顺序 | 页面 / 路由（概念） | 核心能力 |
 |------|---------------------|----------|
@@ -163,6 +168,8 @@
 | GET | `/api/bookings/mine` | 我的预约列表；含 `partnerNickname`、`channelName`、`pairStatus` 等（配对存在时） |
 | DELETE | `/api/cancel-booking/:id` | 取消本人预约（开场前）；服务端删除 `bookings` 行，故**可再次预约同一场次** |
 | POST | `/api/dev/pair-timeslot` | **仅开发**：`NODE_ENV !== 'production'` 或 `ENABLE_DEV_PAIRING=1` 时存在；须登录；Body `timeslot_id`；为当前用户与同场另一名**等级差≤1**的预约者写入 `pairs`（测「我的预约 → 进房」） |
+| GET | `/api/dev/sandbox-lab` | **沙箱**：当前 `themeId`/`timeslotId`/时间；仅非生产或 `ENABLE_SANDBOX_LAB=1` |
+| POST | `/api/dev/sandbox-slot/refresh` | **沙箱**：须登录；重置沙箱场次为约 3 分钟后开场并清空该场次预约与 pairs；仅非生产或 `ENABLE_SANDBOX_LAB=1` |
 | POST | `/api/agora/rtc-token-booking` | 须登录；Body: `timeslot_id`；返回等待大厅或 1v1 频道 Token（`rtcMode`） |
 | POST | `/api/agora/rtc-token` | Body: `channelName`, `uid`；演示联调用 |
 

@@ -41,7 +41,7 @@ project-root/
 │   ├── data/             # 静态配置（如 `themeRotationPool.js` 周主题轮换池）
 │   ├── utils/            # 验证码、配对算法、**周末场次规则**（`weekendSlotRules.js`）、**周主题周期**（`weekThemeCycle.js`）等
 │   ├── cron/             # 定时任务（配对、停配扫描、开场互配等）
-│   ├── public/           # 前端静态页（HTML/CSS/JS，express.static）
+│   ├── public/           # 前端静态页（HTML/CSS/JS，express.static）；含 `dev-lab.html`（沙箱验收入口）
 │   └── app.js            # Express 入口
 ├── db/
 │   └── schema.postgres.sql # 建表脚本（见第 4 节）
@@ -176,10 +176,12 @@ CREATE TABLE credit_logs (
 |------|------|------|
 | POST | `/api/dev/pair-timeslot` | Body：`{ timeslot_id }`（整数）。**须登录**；调用者须在该场次有 `confirmed` 预约，且存在另一名同场次预约者与其**口语等级差≤1**（`utils/levelCompatibility.js`）；事务内 **删除该场次全部 `pairs`** 后 **INSERT** 一行（`channel_name` 形如 `dev_eng_{timeslotId}_{ts}`，满足声网频道字符集）。**禁止**在生产长期开启 `ENABLE_DEV_PAIRING`；用于**早于开场**强制造 `pairs` 的调试，与正常「开场后 `runAutoPairingScan`」不同。 |
 
+**沙箱实验室（见第 6.7 节）**：**已实现** — `GET /api/dev/sandbox-lab`、`POST /api/dev/sandbox-slot/refresh`（须登录；仅非生产或 `ENABLE_SANDBOX_LAB=1`）；`public/dev-lab.html`；`themes.is_sandbox`、`services/sandboxLab.js`、`initDb` 内 `ensureSandboxLab`。
+
 ### 5.3 预约截止（强制）
 
-- **规则**：当场次 `start_time` 与服务器当前时间（`Asia/Shanghai`）相差 **小于 60 分钟** 时，**禁止新建预约**该场次。
-- **实现**：`POST /api/book` 事务前校验；`GET /api/timeslots` 对不可约场次返回 `can_book: false` 及文案（如「开场前 1 小时已截止预约」）。
+- **规则**：当场次 `start_time` 与服务器当前时间（`Asia/Shanghai`）相差 **小于 60 分钟** 时，**禁止新建预约**该场次（**沙箱主题 `is_sandbox` 除外**，见第 6.7 节）。
+- **实现**：`POST /api/bookings` 在调用 `bookTransaction` 前对**非沙箱**场次做上述校验；`GET /api/timeslots` 仍返回场次列表，前端 `booking-flow.js` 对非沙箱场次在距开场不足 60 分钟时禁用卡片。
 - **已存在**的 `confirmed` 预约**不因截止而自动取消**（除非产品另定）。
 
 ### 5.4 配对结果与「具体对象是谁」
@@ -236,6 +238,34 @@ CREATE TABLE credit_logs (
 - **`getActiveThemeWeekMondayNow()`**：在所有满足「已过该周 `bookingOpensAt`」且「当前时刻早于该周 `weekCycleEndsAt`」的上海周一起算的自然周中，返回 **周一 `YYYY-MM-DD` 最大**的一周。避免周日 19:00 起下一周已开放、但本周周期尚未到周日 21:00 结束时，仍把「本周」当作活跃周而导致首页与预约仅展示**已截止**的本周场次。
 - **`getWeekMondaysToEnsure()`**：可返回**多个**周（含重叠窗口内的两周），供启动/定时任务补全 `themes` 与 `timeslots`。
 
+### 6.7 沙箱实验室（已实现，与 `docs/产品描述.md` 第 5.6 节一致）
+
+**目标**：专用主题 `slug=sandbox-lab` + 单场次，支持「约 3 分钟后开场」的滚动时间、**豁免**距开场 60 分钟停新约；两名测试账号预约后可用 **`POST /api/dev/pair-timeslot`** 或开场窗口内 `runAutoPairingScan` 写入 `pairs` 后进房。
+
+| 项 | 实现 |
+|----|------|
+| 数据标记 | `themes.is_sandbox BOOLEAN`（迁移 `migrateThemesSandboxFlag`）；`ensureSandboxLab` 在 `initDb` 末尾创建主题与首条 `timeslots`（若缺） |
+| 场次刷新 | **`POST /api/dev/sandbox-slot/refresh`**（须登录；`app.js` 中 `ENABLE_SANDBOX_LAB=1` 或非 production）：事务内删该场次 `pairs`/`bookings`，将 `start_time`/`end_time` 设为上海 `now+3min`～`now+63min` |
+| 状态查询 | **`GET /api/dev/sandbox-lab`**：返回 `themeId`、`timeslotId`、`startTime`、`endTime`、预约/房间路径提示 |
+| 预约截止 | `POST /api/bookings` 对**非**沙箱场次校验距开场不足 60 分钟则 409；沙箱跳过。`booking-flow.js` 对沙箱主题不显「已截止」 |
+| 场次列表 | `GET /api/timeslots`：若主题为沙箱则**不过滤**周末 20:00；响应 `theme.isSandbox` |
+| 房间 RTC | `rtc-token-booking` 响应 **`isSandbox`**；`room-agora.js` 对沙箱 **waiting** 直接 join 等待大厅，不延迟到 `startTime` |
+| 入口 | **`public/dev-lab.html`**；首页底部链到沙箱页 |
+
+### 6.8 LLM 内容生成 — 豆包（规划，与 `docs/产品描述.md` 第 8.3 节一致）
+
+**目标**：主题名、描述、预习 Markdown、房间内任务与常用句等由服务端调用 **火山引擎豆包** API 生成或润色后**落库**，前端只读接口或既有 `themes` 字段。
+
+**建议工程拆分**：
+
+| 项 | 约定 |
+|----|------|
+| 凭据 | `DOUBAO_API_KEY`（或火山统一 `ARK_API_KEY` 等以实际控制台为准）、可选 `DOUBAO_ENDPOINT` / 模型 ID；**禁止**把 Key 写入前端或仓库 |
+| 服务模块 | 新建 `services/doubaoClient.js`（或 `llm/doubao.js`）：封装请求、超时、重试、日志脱敏 |
+| 输出与存储 | 结构化 JSON（任务 id、标题、hints 数组）经校验后写入 **`themes` 扩展列**（如 `room_tasks_json JSONB`）或独立表 `theme_room_tasks`；`preview_markdown` 仍由现有 docx 路由读取 |
+| 触发方式 | **批量**：周维护任务前生成草稿；**按需**：管理脚本调用；**禁止**用户匿名接口直接烧额度 |
+| 可观测性 | 记录 `prompt_version`、`generated_at`；失败时降级为上一版或 `themeRotationPool` 静态兜底 |
+
 ---
 
 ## 7. 前端规范
@@ -260,6 +290,11 @@ AGORA_APP_ID=
 AGORA_CERTIFICATE=
 SMS_ACCESS_KEY_ID=
 SMS_ACCESS_SECRET=
+# 以下为规划能力（未实现时留空即可）
+ENABLE_DEV_PAIRING=0
+ENABLE_SANDBOX_LAB=0
+DOUBAO_API_KEY=
+# DOUBAO_ENDPOINT=   # 若与默认火山方舟网关不同再填
 ```
 
 ---
@@ -295,6 +330,8 @@ SMS_ACCESS_SECRET=
 | Agora | `POST /api/agora/rtc-token-booking`：需登录 + 预约校验；`POST /api/agora/rtc-token` 仍为演示；生产可收紧 rtc-token |
 | 房间页 | `public/room.html`、`js/room-agora.js`（`timeslot_id` 轮询切频道）、`js/room-practice-tasks.js`（TASKS 列表、常用句折叠、演示刷新/模拟）、`js/room-tasks.js`（CLAIM 信令）、`services/roomTaskWs.js` |
 | 信用分结算 | `credit_logs` 表已建；**无** `POST /api/end-conversation` 等与产品一致的结算链路 |
+| 沙箱实验室 | 产品第 5.6 节、本文第 6.7 节 | **已有**：`is_sandbox`、`sandboxLab.js`、`dev-lab.html`、`GET/POST /api/dev/sandbox-*`、预约/场次/进房例外 |
+| LLM（豆包）写主题/预习/房间任务 | 产品第 8.3 节、本文第 6.8 节 | **未实现**：`services/doubaoClient.js`、环境变量、库表扩展与写入管线 |
 
 **与外部「全栈方案讨论」的差异**：本仓库前端为 **原生 JS**（非 React/Vue 必选）；配对策略以 **`docs/产品描述.md` 第 5.3、9 节** 为准（**开场到点后首轮配对** + 停配 + 开场互配）；主题 **MVP 为固定集**（非 AI 自动生成档期）。若产品决策变更，先改 `docs/产品描述.md` 再改实现。
 

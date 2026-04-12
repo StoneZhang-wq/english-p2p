@@ -47,6 +47,9 @@ npm run dev
 
 当 **`NODE_ENV` 不为 `production`**（例如本地 `npm run dev`）**或** 设置 **`ENABLE_DEV_PAIRING=1`** 时，服务端会挂载 **`POST /api/dev/pair-timeslot`**（见 `ARCHITECTURE.md` 5.2）。**须携带登录 Cookie**；Body 为 `{ "timeslot_id": <数字> }`。调用者本人须已在该场次预约，且存在另一名**等级差≤1**的已确认预约；成功后会清空该场次旧 `pairs` 并插入新行，便于测「我的预约 → 进入房间」。
 
+**沙箱实验室（已实现）**：本地或非生产默认启用 `GET /api/dev/sandbox-lab`、`POST /api/dev/sandbox-slot/refresh`（须登录）；静态页 `backend/public/dev-lab.html`。生产需显式 `ENABLE_SANDBOX_LAB=1`。详见 `ARCHITECTURE.md` 第 6.7 节。  
+**豆包 LLM（规划）**：见 `docs/产品描述.md` 第 8.3 节与 `ARCHITECTURE.md` 第 6.8 节。
+
 示例（在已登录浏览器的开发者工具 Console 中执行，或自行换 Cookie）：
 
 ```javascript

@@ -18,7 +18,8 @@ router.get("/by-id", async (req, res) => {
     const pool = getPool();
     const { rows } = await pool.query(
       `SELECT id, name, description, slug, theme_slot, scene_text, roles_json, cover_url, difficulty_level,
-        is_active, shanghai_week_monday::text AS week_monday, preview_markdown
+        is_active, shanghai_week_monday::text AS week_monday, preview_markdown,
+        COALESCE(is_sandbox, FALSE) AS is_sandbox
        FROM themes WHERE id = $1`,
       [id]
     );
@@ -43,6 +44,7 @@ router.get("/by-id", async (req, res) => {
           weekMonday: r.week_monday,
           isActive: Number(r.is_active) === 1,
           previewMarkdown: r.preview_markdown || "",
+          isSandbox: Boolean(r.is_sandbox),
         },
       },
     });

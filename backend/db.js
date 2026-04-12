@@ -7,6 +7,7 @@ const {
   weekCycleEndsAtForWeekMonday,
 } = require("./utils/weekThemeCycle");
 const { pickThreeForWeek } = require("./data/themeRotationPool");
+const { ensureSandboxLab } = require("./services/sandboxLab");
 
 let pool;
 
@@ -65,6 +66,10 @@ async function migrateUsersPasswordColumn(p) {
   `);
 }
 
+async function migrateThemesSandboxFlag(p) {
+  await p.query(`ALTER TABLE themes ADD COLUMN IF NOT EXISTS is_sandbox BOOLEAN NOT NULL DEFAULT FALSE`);
+}
+
 async function migrateWeeklyThemesColumns(p) {
   await p.query(`
     ALTER TABLE themes
@@ -86,7 +91,8 @@ async function migrateWeeklyThemesColumns(p) {
 
 async function archiveExpiredThemeWeeks(p) {
   const { rows } = await p.query(
-    `SELECT id, shanghai_week_monday::text AS week_m FROM themes WHERE is_active = 1 AND shanghai_week_monday IS NOT NULL`
+    `SELECT id, shanghai_week_monday::text AS week_m FROM themes
+     WHERE is_active = 1 AND shanghai_week_monday IS NOT NULL AND COALESCE(is_sandbox, FALSE) = FALSE`
   );
   const now = Date.now();
   for (const row of rows) {
@@ -215,9 +221,13 @@ async function initDb() {
     await runSqlFile(client, schemaPath);
     await migrateUsersPasswordColumn(client);
     await migrateWeeklyThemesColumns(client);
-    await client.query(`UPDATE themes SET is_active = 0 WHERE shanghai_week_monday IS NULL`);
+    await migrateThemesSandboxFlag(client);
+    await client.query(
+      `UPDATE themes SET is_active = 0 WHERE shanghai_week_monday IS NULL AND COALESCE(is_sandbox, FALSE) = FALSE`
+    );
     await archiveExpiredThemeWeeks(client);
     await ensureWeeklyThemeCycle(client);
+    await ensureSandboxLab(client);
   } finally {
     client.release();
   }

@@ -13,7 +13,10 @@ router.get("/", async (req, res) => {
       return res.status(400).json({ code: 400, message: "缺少或无效 theme_id", data: null });
     }
 
-    const { rows: themeRows } = await pool.query("SELECT id, name FROM themes WHERE id = $1", [themeId]);
+    const { rows: themeRows } = await pool.query(
+      "SELECT id, name, COALESCE(is_sandbox, FALSE) AS is_sandbox FROM themes WHERE id = $1",
+      [themeId]
+    );
     const theme = themeRows[0];
     if (!theme) {
       return res.status(404).json({ code: 404, message: "主题不存在", data: null });
@@ -31,13 +34,14 @@ router.get("/", async (req, res) => {
       [themeId]
     );
 
-    const filtered = rows.filter((r) => isShanghaiSaturdayOrSundayEightPm(r.start_time));
+    const isSandboxTheme = theme.is_sandbox === true;
+    const filtered = isSandboxTheme ? rows : rows.filter((r) => isShanghaiSaturdayOrSundayEightPm(r.start_time));
 
     res.json({
       code: 0,
       message: "ok",
       data: {
-        theme: { id: theme.id, name: theme.name },
+        theme: { id: theme.id, name: theme.name, isSandbox: isSandboxTheme },
         timeslots: filtered.map((r) => ({
           id: r.id,
           themeId: r.theme_id,

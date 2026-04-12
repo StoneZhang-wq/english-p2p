@@ -42,11 +42,15 @@ router.post("/rtc-token-booking", requireAuth, async (req, res) => {
 
     const { rows: slotRows } = await pool.query(
       `SELECT to_char(t.start_time, 'YYYY-MM-DD HH24:MI:SS') AS start_time,
-              to_char(t.end_time, 'YYYY-MM-DD HH24:MI:SS') AS end_time
-       FROM timeslots t WHERE t.id = $1 LIMIT 1`,
+              to_char(t.end_time, 'YYYY-MM-DD HH24:MI:SS') AS end_time,
+              COALESCE(th.is_sandbox, FALSE) AS is_sandbox
+       FROM timeslots t
+       JOIN themes th ON th.id = t.theme_id
+       WHERE t.id = $1 LIMIT 1`,
       [tid]
     );
     const slot = slotRows[0] || {};
+    const isSandbox = slot.is_sandbox === true;
 
     const result = buildRtcToken(channelName, uid);
     res.json({
@@ -62,6 +66,7 @@ router.post("/rtc-token-booking", requireAuth, async (req, res) => {
         timeslotId: tid,
         startTime: slot.start_time || null,
         endTime: slot.end_time || null,
+        isSandbox,
       },
     });
   } catch (e) {

@@ -21,6 +21,7 @@
     roles: [],
     previewMarkdown: "",
     isActive: true,
+    isSandbox: false,
   };
 
   function escHtml(s) {
@@ -31,7 +32,7 @@
 
   function fillSceneAndRoles() {
     var badgeEl = document.getElementById("themeBadge");
-    if (badgeEl) badgeEl.textContent = meta.badge || "本周主题";
+    if (badgeEl) badgeEl.textContent = meta.isSandbox ? "沙箱实验室" : meta.badge || "本周主题";
     document.getElementById("themeTitle").textContent = meta.title;
     document.getElementById("themeDesc").textContent = meta.desc;
     var img = document.getElementById("themeCover");
@@ -98,6 +99,7 @@
   }
 
   function isSlotBookingClosed(startIso) {
+    if (meta.isSandbox) return false;
     return minutesUntilStart(startIso) < 60;
   }
 
@@ -299,6 +301,10 @@
         if (!x.ok || x.j.code !== 0) {
           throw new Error(x.j.message || "加载失败");
         }
+        if (x.j.data && x.j.data.theme && typeof x.j.data.theme.isSandbox === "boolean") {
+          meta.isSandbox = x.j.data.theme.isSandbox;
+          fillSceneAndRoles();
+        }
         slots = x.j.data.timeslots || [];
         renderSlots();
         updateBtn();
@@ -427,6 +433,7 @@
         meta.roles = Array.isArray(t.roles) ? t.roles : [];
         meta.previewMarkdown = t.previewMarkdown || "";
         meta.isActive = t.isActive !== false;
+        meta.isSandbox = !!t.isSandbox;
         fillSceneAndRoles();
         if (!meta.isActive) {
           setPollStatus("该主题所属练习周已结束，仅可查看历史信息。", true);

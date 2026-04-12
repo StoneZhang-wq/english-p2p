@@ -25,7 +25,8 @@ CREATE TABLE IF NOT EXISTS themes (
   scene_text TEXT,
   roles_json TEXT,
   cover_url TEXT,
-  preview_markdown TEXT
+  preview_markdown TEXT,
+  is_sandbox BOOLEAN NOT NULL DEFAULT FALSE
 );
 
 -- 周主题唯一索引见 backend/db.js migrateWeeklyThemesColumns（须在 ALTER 之后执行）

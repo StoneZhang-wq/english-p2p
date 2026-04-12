@@ -1,0 +1,178 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+    <title>沙箱实验室 — 英语口语练习</title>
+    <link rel="stylesheet" href="css/styles.css" />
+    <style>
+      .dev-lab-box {
+        margin-top: 12px;
+        padding: 14px 16px;
+        border-radius: 12px;
+        background: var(--bg-card, #fff);
+        border: 1px solid var(--border-light, #e5e7eb);
+        font-size: 0.875rem;
+        line-height: 1.55;
+      }
+      .dev-lab-box code {
+        font-size: 0.8125rem;
+        word-break: break-all;
+      }
+      .dev-lab-actions {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 10px;
+        margin-top: 14px;
+      }
+      .dev-lab-actions a,
+      .dev-lab-actions button {
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        min-height: 44px;
+        padding: 0 16px;
+        border-radius: 10px;
+        font-weight: 600;
+        font-size: 0.875rem;
+        cursor: pointer;
+        border: none;
+        text-decoration: none;
+      }
+      .dev-lab-actions .btn-primary {
+        background: var(--blue-primary, #1a5cff);
+        color: #fff;
+      }
+      .dev-lab-actions .btn-secondary {
+        background: #eef2ff;
+        color: #1d4ed8;
+      }
+      .dev-lab-err {
+        color: var(--danger, #d93025);
+        margin-top: 8px;
+      }
+    </style>
+  </head>
+  <body data-page="booking">
+    <div class="app-shell">
+      <div class="top-bar">
+        <a class="back-link" href="index.html">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <path d="M15 18l-6-6 6-6" />
+          </svg>
+          返回首页
+        </a>
+      </div>
+
+      <h1 class="page-title-simple" style="margin-top: 8px">沙箱实验室</h1>
+      <p class="sub" style="color: var(--text-secondary); margin: 0 0 8px">
+        专用测试主题与场次：刷新后场次为<strong>约 3 分钟后</strong>开场（上海时间），不受周末 20:00 与「开场前 1
+        小时停约」限制。仅开发环境或开启 <code>ENABLE_SANDBOX_LAB=1</code> 时可用。
+      </p>
+
+      <div class="dev-lab-box" id="sandboxState" aria-live="polite">正在加载沙箱信息…</div>
+      <p class="dev-lab-err" id="sandboxErr" hidden></p>
+
+      <div class="dev-lab-actions">
+        <button type="button" class="btn-primary" id="btnRefreshSlot">刷新场次（清空本沙箱预约并重置时间）</button>
+        <a class="btn-secondary" id="linkBooking" href="#" hidden>去预约该主题</a>
+        <a class="btn-secondary" href="appointments.html">我的预约</a>
+      </div>
+
+      <div class="dev-lab-box" style="margin-top: 16px">
+        <strong>双账号进房</strong>
+        <ol style="margin: 8px 0 0 18px; padding: 0">
+          <li>用账号 A、B 分别登录，各预约上方面板中的<strong>同一场次</strong>。</li>
+          <li>在本地开发环境调用 <code>POST /api/dev/pair-timeslot</code>（Body: <code>timeslot_id</code>）写入
+            <code>pairs</code>；或等到开场时间后由定时配对扫描写入。</li>
+          <li>在「我的预约」进入房间，或使用 <code>room.html?timeslot_id=…</code>。</li>
+        </ol>
+      </div>
+    </div>
+
+    <script>
+      (function () {
+        var stateEl = document.getElementById("sandboxState");
+        var errEl = document.getElementById("sandboxErr");
+        var btn = document.getElementById("btnRefreshSlot");
+        var linkBooking = document.getElementById("linkBooking");
+
+        function showErr(msg) {
+          errEl.textContent = msg || "";
+          errEl.hidden = !msg;
+        }
+
+        function render(data) {
+          if (!data || !data.themeId) {
+            stateEl.textContent = "未返回有效数据。";
+            return;
+          }
+          var lines = [
+            "<strong>theme_id</strong>：<code>" + data.themeId + "</code>",
+            "<strong>timeslot_id</strong>：<code>" + (data.timeslotId != null ? data.timeslotId : "（无场次，请先刷新）") + "</code>",
+          ];
+          if (data.startTime) lines.push("<strong>start</strong>：<code>" + data.startTime + "</code>（上海 naive）");
+          if (data.endTime) lines.push("<strong>end</strong>：<code>" + data.endTime + "</code>");
+          stateEl.innerHTML = lines.join("<br/>");
+          if (data.themeId) {
+            linkBooking.href = "booking.html?theme_id=" + encodeURIComponent(String(data.themeId));
+            linkBooking.hidden = false;
+          }
+        }
+
+        function loadState() {
+          showErr("");
+          stateEl.textContent = "正在加载…";
+          return fetch("/api/dev/sandbox-lab")
+            .then(function (r) {
+              return r.json().then(function (j) {
+                return { ok: r.ok, j: j, status: r.status };
+              });
+            })
+            .then(function (x) {
+              if (!x.ok || x.j.code !== 0) {
+                stateEl.textContent = "";
+                showErr((x.j && x.j.message) || "加载失败（可能未启用沙箱 API 或服务未就绪）");
+                return;
+              }
+              render(x.j.data);
+            })
+            .catch(function () {
+              stateEl.textContent = "";
+              showErr("网络错误");
+            });
+        }
+
+        btn.addEventListener("click", function () {
+          btn.disabled = true;
+          showErr("");
+          fetch("/api/dev/sandbox-slot/refresh", { method: "POST", credentials: "include" })
+            .then(function (r) {
+              return r.json().then(function (j) {
+                return { ok: r.ok, j: j };
+              });
+            })
+            .then(function (x) {
+              if (x.j.code === 0) {
+                render(x.j.data);
+                return;
+              }
+              if (x.j.code === 401) {
+                window.location.href = "login.html?next=" + encodeURIComponent("/dev-lab.html");
+                return;
+              }
+              showErr(x.j.message || "刷新失败");
+            })
+            .catch(function () {
+              showErr("网络错误");
+            })
+            .finally(function () {
+              btn.disabled = false;
+            });
+        });
+
+        loadState();
+      })();
+    </script>
+  </body>
+</html>
