@@ -240,6 +240,7 @@
    */
   window.__applyRoomTasksFromApi = function (tasks) {
     if (!list || !Array.isArray(tasks) || tasks.length === 0) return;
+    var DESIRED_TOTAL = 6;
     var normalized = tasks
       .map(function (t) {
         return {
@@ -252,7 +253,33 @@
         return t.id && t.title && t.hints.length >= 2;
       });
     if (!normalized.length) return;
-    renderFromSet(normalized, 0);
+    // 产品规则：房间 TASKS 始终展示 6 条；接口不足时用占位任务补齐。
+    var next = normalized.slice(0, DESIRED_TOTAL);
+    if (next.length < DESIRED_TOTAL) {
+      var used = {};
+      next.forEach(function (t) {
+        used[t.id] = true;
+      });
+      ALT_SET.forEach(function (t) {
+        if (next.length >= DESIRED_TOTAL) return;
+        var id = String(t.id || "");
+        if (!id || used[id]) id = "pad_" + (next.length + 1);
+        next.push({
+          id: id,
+          title: String(t.title || "【占位】补齐任务"),
+          hints: Array.isArray(t.hints) ? t.hints.map(String).filter(Boolean) : [],
+        });
+        used[id] = true;
+      });
+    }
+    while (next.length < DESIRED_TOTAL) {
+      next.push({
+        id: "pad_" + (next.length + 1),
+        title: "【占位】补齐任务",
+        hints: ["Could you say that again, please?", "Let me think for a second."],
+      });
+    }
+    renderFromSet(next, 0);
     showToast("已加载本主题的练习任务", false);
   };
 
