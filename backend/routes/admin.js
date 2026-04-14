@@ -1,6 +1,8 @@
 const express = require("express");
 const { getPool } = require("../db");
 const { requireAdmin } = require("../middleware/requireAdmin");
+const { POOL } = require("../data/themeRotationPool");
+const { refreshActiveThemesWithLlm } = require("../services/themeLlmEnrichment");
 
 const router = express.Router();
 
@@ -174,6 +176,144 @@ router.post("/timeslots/:id/pair", requireAdmin, async (req, res) => {
     res.status(500).json({ code: 500, message: "服务器错误", data: null });
   } finally {
     client.release();
+  }
+});
+
+// —— 周主题：轮换池种子 + LLM 整批刷新（仅 ADMIN_EMAILS） ——
+
+// GET /api/admin/themes/active
+router.get("/themes/active", requireAdmin, async (_req, res) => {
+  try {
+    const pool = getPool();
+    const { rows } = await pool.query(
+      `SELECT id, name, description, theme_slot, difficulty_level,
+              shanghai_week_monday::text AS week_monday,
+              llm_generated_at::text AS llm_generated_at,
+              llm_prompt_version,
+              LEFT(COALESCE(scene_text, ''), 160) AS scene_preview
+       FROM themes
+       WHERE is_active = 1
+         AND COALESCE(is_sandbox, FALSE) = FALSE
+         AND shanghai_week_monday IS NOT NULL
+       ORDER BY shanghai_week_monday DESC, theme_slot ASC
+       LIMIT 3`
+    );
+    res.json({
+      code: 0,
+      message: "ok",
+      data: {
+        themes: rows.map((r) => ({
+          id: r.id,
+          name: r.name,
+          description: r.description,
+          themeSlot: r.theme_slot,
+          difficultyLevel: r.difficulty_level,
+          weekMonday: r.week_monday,
+          llmGeneratedAt: r.llm_generated_at,
+          llmPromptVersion: r.llm_prompt_version,
+          scenePreview: r.scene_preview,
+        })),
+      },
+    });
+  } catch (e) {
+    console.error("[admin] GET themes/active", e);
+    res.status(500).json({ code: 500, message: "服务器错误", data: null });
+  }
+});
+
+// GET /api/admin/themes/pool  （轮换池索引列表，供套用种子）
+router.get("/themes/pool", requireAdmin, async (_req, res) => {
+  try {
+    const entries = POOL.map((p, i) => ({
+      index: i,
+      name: p.name,
+      description: p.description,
+      difficultyLevel: p.difficulty_level,
+    }));
+    res.json({ code: 0, message: "ok", data: { pool: entries, count: POOL.length } });
+  } catch (e) {
+    console.error("[admin] GET themes/pool", e);
+    res.status(500).json({ code: 500, message: "服务器错误", data: null });
+  }
+});
+
+// POST /api/admin/themes/llm-refresh-active  （当前活跃至多 3 条主题整批 LLM，与 dev 接口同逻辑，无需 ENABLE_DEV_PAIRING）
+router.post("/themes/llm-refresh-active", requireAdmin, async (_req, res) => {
+  try {
+    const data = await refreshActiveThemesWithLlm(getPool());
+    res.json({ code: 0, message: "ok", data });
+  } catch (e) {
+    const code = e && e.code;
+    if (code === "LLM_NOT_CONFIGURED") {
+      return res.status(503).json({ code: 503, message: e.message, data: null });
+    }
+    if (code === "REFRESH_IN_PROGRESS") {
+      return res.status(409).json({ code: 409, message: e.message, data: null });
+    }
+    console.error("[admin] POST themes/llm-refresh-active", e);
+    const msg = e && e.message ? e.message : "服务器错误";
+    return res.status(500).json({ code: 500, message: msg, data: null });
+  }
+});
+
+// POST /api/admin/themes/:id/apply-pool-index  Body: { pool_index: number }
+router.post("/themes/:id/apply-pool-index", requireAdmin, async (req, res) => {
+  const themeId = Number(req.params.id);
+  const poolIndex = Number(req.body?.pool_index != null ? req.body.pool_index : req.body?.poolIndex);
+  if (!themeId || Number.isNaN(themeId)) {
+    return res.status(400).json({ code: 400, message: "theme id 无效", data: null });
+  }
+  if (!Number.isInteger(poolIndex) || poolIndex < 0 || poolIndex >= POOL.length) {
+    return res.status(400).json({
+      code: 400,
+      message: "pool_index 须为 0～" + (POOL.length - 1) + " 的整数",
+      data: null,
+    });
+  }
+  const def = POOL[poolIndex];
+  try {
+    const pool = getPool();
+    const upd = await pool.query(
+      `UPDATE themes SET
+         name = $1,
+         description = $2,
+         difficulty_level = $3,
+         scene_text = $4,
+         roles_json = $5,
+         cover_url = $6,
+         preview_markdown = $7,
+         llm_generated_at = NULL,
+         llm_prompt_version = NULL,
+         room_tasks_json = NULL
+       WHERE id = $8
+         AND is_active = 1
+         AND COALESCE(is_sandbox, FALSE) = FALSE`,
+      [
+        def.name,
+        def.description,
+        def.difficulty_level,
+        def.scene_text,
+        def.roles_json,
+        def.cover_url,
+        def.preview_markdown,
+        themeId,
+      ]
+    );
+    if (upd.rowCount !== 1) {
+      return res.status(404).json({
+        code: 404,
+        message: "未更新：主题不存在、非当前上架(is_active)或为沙箱",
+        data: null,
+      });
+    }
+    res.json({
+      code: 0,
+      message: "ok",
+      data: { themeId, poolIndex, seedName: def.name },
+    });
+  } catch (e) {
+    console.error("[admin] POST themes/apply-pool-index", e);
+    res.status(500).json({ code: 500, message: "服务器错误", data: null });
   }
 });
 

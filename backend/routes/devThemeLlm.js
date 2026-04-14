@@ -48,6 +48,9 @@ router.post("/theme-llm-refresh-active", requireAuth, async (_req, res) => {
     if (code === "LLM_NOT_CONFIGURED") {
       return res.status(503).json({ code: 503, message: e.message, data: null });
     }
+    if (code === "REFRESH_IN_PROGRESS") {
+      return res.status(409).json({ code: 409, message: e.message, data: null });
+    }
     console.error("[dev theme-llm-refresh-active]", e);
     const msg = e && e.message ? e.message : "服务器错误";
     return res.status(500).json({ code: 500, message: msg, data: null });

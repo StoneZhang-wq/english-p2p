@@ -179,6 +179,10 @@ CREATE TABLE credit_logs (
 | GET | `/api/admin/timeslots/:id/pairs` | 返回该场次 pairs 列表 |
 | POST | `/api/admin/timeslots/:id/pair` | Body：`{ user_a, user_b, force? }`；两人须均已预约该场次；`force=true` 时会先清掉该场次中涉及任一人的旧 pairs；随后插入一条新 pairs（频道名 `admin_eng_...`） |
 | POST | `/api/admin/timeslots/:id/unpair` | Body：`{ pair_id }`；删除该场次指定 pairs |
+| GET | `/api/admin/themes/active` | 当前 `is_active` 的正式周主题**至多 3 条**（含 id、槽位、周、LLM 版本摘要） |
+| GET | `/api/admin/themes/pool` | `themeRotationPool.js` 轮换池**索引列表**（供套用种子） |
+| POST | `/api/admin/themes/:id/apply-pool-index` | Body：`{ pool_index }`（整数）。将 `POOL[pool_index]` 写入该主题的种子字段，并清空 `llm_generated_at` / `room_tasks_json`；**仅**当该行 `is_active=1` 且非沙箱 |
+| POST | `/api/admin/themes/llm-refresh-active` | 无 Body。与 `POST /api/dev/theme-llm-refresh-active` 同逻辑，**须 `ADMIN_EMAILS`**，**生产可用**；并发第二次返回 **409**（`REFRESH_IN_PROGRESS`） |
 
 **开发调试（非正式配对）**：当 `NODE_ENV !== 'production'` **或** `ENABLE_DEV_PAIRING=1` 时挂载 `routes/devPairing.js`（否则不注册该路径）：
 
@@ -278,7 +282,7 @@ CREATE TABLE credit_logs (
 | 服务模块 | `services/llmChat.js`（HTTP `fetch`）、`services/themeLlmEnrichment.js`（`theme_pack_v2` 提示词、JSON 校验、`tryEnrichThemesWithLlm`、`refreshActiveThemesWithLlm`、`rerunThemeLlmForDev`；生成时注入**最近 12 个主题**场景摘录以避免撞场景） |
 | 存储 | `themes.room_tasks_json`（JSONB，**6** 条任务）、`themes.llm_generated_at`、`themes.llm_prompt_version`；其余覆盖 `name`、`description`、`scene_text`、`roles_json`、`preview_markdown`、`difficulty_level`；**`cover_url` 在 LLM 写回时用种子行原值保留** |
 | 触发 | **`initDb` 结束后**尝试一轮；**`runWeeklyThemeMaintenance`（每 10 分钟）**后再尝试；每次最多 **3** 条 `llm_generated_at IS NULL` 且**非沙箱**的周主题 |
-| 整批刷新当前周 | **`POST /api/dev/theme-llm-refresh-active`**（须 `ENABLE_DEV_PAIRING=1` 或非 production）：对当前 `is_active` 的至多 **3** 条正式主题顺序重生成并覆盖（保留封面） |
+| 整批刷新当前周 | **推荐生产**：**`POST /api/admin/themes/llm-refresh-active`**（须 `ADMIN_EMAILS`）。**调试**：`POST /api/dev/theme-llm-refresh-active`（须 `ENABLE_DEV_PAIRING=1` 或非 production）。对当前 `is_active` 的至多 **3** 条正式主题顺序重生成；**并发第二次409**（`REFRESH_IN_PROGRESS`） |
 | 房间展示 | `room-agora.js` 首次 `rtc-token-booking` 成功后调用 `window.__applyRoomTasksFromApi(roomTasks)`；无 `room_tasks_json` 时保留 `room.html` 默认静态任务 |
 | 未配置 Key | `tryEnrichThemesWithLlm` 直接跳过；种子数据仍来自 `themeRotationPool` |
 

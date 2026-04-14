@@ -56,7 +56,38 @@
 
         <section class="room-tasks-panel">
           <div class="room-tasks-head">
-            <h3 class="room-tasks-heading">3) 手动配对/解除（调试用）</h3>
+            <h3 class="room-tasks-heading">3) 周主题：轮换池种子 + LLM 刷新（管理员）</h3>
+          </div>
+          <div class="hint">
+            先对<strong>当前上架的 3 个主题</strong>分别「套用轮换池索引」，再点「整批 LLM 刷新」。刷新可能需数分钟，请勿重复点击。
+           生产环境推荐使用本区接口，无需开启 <code>ENABLE_DEV_PAIRING</code>。
+          </div>
+          <div class="admin-row">
+            <button id="btnLoadThemePool">拉取轮换池列表</button>
+            <button id="btnLoadActiveThemes">拉取当前活跃主题</button>
+          </div>
+          <pre id="outThemePool">（轮换池未加载）</pre>
+          <pre id="outActiveThemes">（活跃主题未加载）</pre>
+          <div class="admin-row" style="margin-top: 10px">
+            <label>
+              主题 id
+              <input id="applyThemeId" placeholder="来自上方「活跃主题」的 id" />
+            </label>
+            <label>
+              轮换池索引 pool_index
+              <input id="applyPoolIndex" placeholder="0 ～ N-1" />
+            </label>
+            <button id="btnApplyPoolIndex">套用轮换池种子</button>
+          </div>
+          <div class="admin-row" style="margin-top: 10px">
+            <button id="btnLlmRefreshActive">整批 LLM刷新（当前至多 3 主题）</button>
+          </div>
+          <pre id="outThemeOps">（主题操作结果）</pre>
+        </section>
+
+        <section class="room-tasks-panel">
+          <div class="room-tasks-head">
+            <h3 class="room-tasks-heading">4) 手动配对/解除（调试用）</h3>
           </div>
           <div class="admin-row">
             <label>
@@ -99,6 +130,60 @@
         const el = document.getElementById(id);
         return el ? String(el.value || "").trim() : "";
       }
+
+      document.getElementById("btnLoadThemePool").addEventListener("click", async function () {
+        const out = document.getElementById("outThemePool");
+        out.textContent = "加载中…";
+        try {
+          const json = await api("/api/admin/themes/pool");
+          out.textContent = JSON.stringify(json, null, 2);
+        } catch (e) {
+          out.textContent = "失败：" + (e.message || e);
+        }
+      });
+
+      document.getElementById("btnLoadActiveThemes").addEventListener("click", async function () {
+        const out = document.getElementById("outActiveThemes");
+        out.textContent = "加载中…";
+        try {
+          const json = await api("/api/admin/themes/active");
+          out.textContent = JSON.stringify(json, null, 2);
+        } catch (e) {
+          out.textContent = "失败：" + (e.message || e);
+        }
+      });
+
+      document.getElementById("btnApplyPoolIndex").addEventListener("click", async function () {
+        const themeId = val("applyThemeId");
+        const poolIndex = val("applyPoolIndex");
+        const out = document.getElementById("outThemeOps");
+        out.textContent = "提交中…";
+        try {
+          const json = await api("/api/admin/themes/" + encodeURIComponent(themeId) + "/apply-pool-index", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ pool_index: Number(poolIndex) }),
+          });
+          out.textContent = JSON.stringify(json, null, 2);
+        } catch (e) {
+          out.textContent = "失败：" + (e.message || e);
+        }
+      });
+
+      document.getElementById("btnLlmRefreshActive").addEventListener("click", async function () {
+        const out = document.getElementById("outThemeOps");
+        out.textContent = "LLM 刷新已提交（可能需数分钟，请看服务端日志）…";
+        try {
+          const json = await api("/api/admin/themes/llm-refresh-active", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: "{}",
+          });
+          out.textContent = JSON.stringify(json, null, 2);
+        } catch (e) {
+          out.textContent = "失败：" + (e.message || e);
+        }
+      });
 
       document.getElementById("btnLoadSlots").addEventListener("click", async function () {
         const themeId = val("themeId");

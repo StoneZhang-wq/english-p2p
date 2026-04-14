@@ -11,6 +11,9 @@ const PROMPT_VERSION = "theme_pack_v2";
 /** 去重参考：最近 N 条（非当前批次）主题 */
 const DEDUP_THEME_LIMIT = 12;
 
+/** 防止多个 HTTP 请求同时整批刷新同一批活跃主题 */
+var refreshActiveInProgress = false;
+
 const ROOM_TASKS_MIN = 5;
 const ROOM_TASKS_MAX = 7;
 const ROOM_TASKS_TARGET = 6;
@@ -342,6 +345,20 @@ async function tryEnrichThemesWithLlm(pool) {
  * @param {import("pg").Pool} pool
  */
 async function refreshActiveThemesWithLlm(pool) {
+  if (refreshActiveInProgress) {
+    var busy = new Error("当前已有主题 LLM 整批刷新在执行中，请等待完成后重试");
+    busy.code = "REFRESH_IN_PROGRESS";
+    throw busy;
+  }
+  refreshActiveInProgress = true;
+  try {
+    return await refreshActiveThemesWithLlmBody(pool);
+  } finally {
+    refreshActiveInProgress = false;
+  }
+}
+
+async function refreshActiveThemesWithLlmBody(pool) {
   if (!isLlmConfigured()) {
     var e0 = new Error("LLM 未配置：请设置 OPENAI_API_KEY 等");
     e0.code = "LLM_NOT_CONFIGURED";
