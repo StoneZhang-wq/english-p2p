@@ -235,6 +235,8 @@ CREATE TABLE credit_logs (
 - **Token**：**必须**启用控制台 **App Certificate**。正式预约进房使用 `POST /api/agora/rtc-token-booking`（`timeslot_id`）；演示联调仍可用 `POST /api/agora/rtc-token`（`channelName` + `uid`）。流程：`createClient` → `join` → `createMicrophoneAudioTrack` → `publish`；可调用 `enableLogUpload` 便于排障。
 - 前端仅使用接口返回的 `channelName` / token / appId；**禁止**前端自拟频道名（`room.html?timeslot_id=` 为预约路径；`?channel=&uid=` 为演示路径）。
 - iOS 非 Safari 麦克风限制：房间页**顶部红色提示**建议使用 Safari 或 Chrome。
+- **房间内信令（WebSocket）**：`GET /ws/room?channel=…&uid=…`（`services/roomTaskWs.js` 在 HTTP `upgrade` 上接入）。与产品一致的消息包括：`task_complete_request` / `task_confirm_prompt` / `task_confirm_response` / `task_confirm_result`（CLAIM 确认流）；**角色互换**：客户端发送 `role_swap_intent`（JSON字段 `wants: boolean`），服务端向**同频道其他 uid** 转发 `role_swap_peer_intent`（含 `fromUid`、`wants`）。两端均在本地维护「己方 / 对方是否请求互换」，**仅当双方同时为 true** 时执行界面角色交换并再发 `wants: false` 复位；实现见 `public/js/room-tasks.js`（`__roomSendRoleSwapIntent`）、`public/js/room-role-swap.js`。
+- **预约进房与 WS的 channel/uid**：`room.html?timeslot_id=` 的 URL **不含** `channel`/`uid`；`room-agora.js` 在每次 `rtc-token-booking`（及轮询切频道）成功后调用 `window.__roomWsSetChannelUid(channelName, uid)`，`room-tasks.js` 据此重连 WebSocket，与 Agora 所在频道一致。
 
 ### 6.5 定时任务（Cron）与事件
 
@@ -356,7 +358,7 @@ DOUBAO_API_KEY=
 | 配对（开场首轮 / 取消重配 / 停配 / 开场互配） | **部分**：`runAutoPairingScan` 开场窗口内贪心写 `pairs`；**通知、停配扫描、落单互配**仍待实现 |
 | 我的预约 | `GET /api/bookings/mine`：含 `LEFT JOIN pairs` 展示搭档昵称等（若库中已有配对行） |
 | Agora | `POST /api/agora/rtc-token-booking`：需登录 + 预约校验；`POST /api/agora/rtc-token` 仍为演示；生产可收紧 rtc-token |
-| 房间页 | `public/room.html`、`js/room-agora.js`（`timeslot_id` 轮询切频道）、`js/room-practice-tasks.js`（TASKS 列表、常用句折叠、演示刷新/模拟）、`js/room-tasks.js`（CLAIM 信令）、`services/roomTaskWs.js` |
+| 房间页 | `public/room.html`、`js/room-agora.js`（`timeslot_id` 轮询切频道）、`js/room-practice-tasks.js`（TASKS 列表、常用句折叠、演示刷新/模拟）、`js/room-tasks.js`（CLAIM + `role_swap_intent` 信令）、`js/room-role-swap.js`（角色与双方确认互换 UI）、`services/roomTaskWs.js` |
 | 信用分结算 | `credit_logs` 表已建；**无** `POST /api/end-conversation` 等与产品一致的结算链路 |
 | 沙箱实验室 | 产品第 5.6 节、本文第 6.7 节 | **已有**：`is_sandbox`、`sandboxLab.js`、`dev-lab.html`、`GET/POST /api/dev/sandbox-*`、预约/场次/进房例外 |
 | LLM（OpenAI 兼容：豆包方舟等）写主题/预习/房间任务 | 产品第 8.3 节、本文第 6.8 节 | **已实现**：`services/llmChat.js`、`services/themeLlmEnrichment.js`；`OPENAI_*` / `MODEL_PROVIDER`；`themes.room_tasks_json`、`llm_generated_at`、`llm_prompt_version`；`rtc-token-booking` 返回 `roomTasks` |

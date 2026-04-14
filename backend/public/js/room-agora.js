@@ -125,13 +125,11 @@
   function showWaitFlowForBooking(cred) {
     wireRoomWaitUiOnce();
     var flow = document.getElementById("roomWaitFlow");
-    var statusEl = document.getElementById("roomWaitStatus");
-    if (!flow || !statusEl) return;
+    if (!flow) return;
     if (cred.rtcMode !== "waiting") {
       hideWaitFlowUi();
       return;
     }
-    statusEl.textContent = "练习间已就绪，开场后将为你分配语伴";
     flow.hidden = false;
     state.slotStartMs = parseShanghaiStartMs(cred.startTime);
     state.slotEndMs = parseShanghaiStartMs(cred.endTime);
@@ -146,6 +144,14 @@
     var raw = document.body.getAttribute("data-api-base");
     if (raw === null || raw === "") return window.location.origin;
     return String(raw).replace(/\/$/, "");
+  }
+
+  /** 与 room-tasks.js 的 WebSocket 同频道一致（预约路径 URL 无 channel/uid） */
+  function publishWsIdentity(cred) {
+    if (!cred || !cred.channelName || cred.uid == null) return;
+    if (typeof window.__roomWsSetChannelUid === "function") {
+      window.__roomWsSetChannelUid(cred.channelName, cred.uid);
+    }
   }
 
   function showRoomToast(msg, isError) {
@@ -383,6 +389,7 @@
         }
         updateMatchCtaVisibility();
         if (!next || next.channelName === state.lastJoinedChannel) return;
+        publishWsIdentity(next);
         showRoomToast("已切换至语伴专属频道", false);
         await leaveMediaAndClient();
         state.lastJoinedChannel = next.channelName;
@@ -430,6 +437,7 @@
       return;
     }
     var cred = await fetchRtcTokenBooking(state.timeslotId);
+    publishWsIdentity(cred);
     state.isSandbox = !!cred.isSandbox;
     state.lastRtcMode = cred.rtcMode || state.lastRtcMode;
     if (cred.startTime) {
@@ -495,6 +503,7 @@
         state.timeslotId = tid;
         state.savedAreaToken = areaToken;
         cred = await fetchRtcTokenBooking(tid);
+        publishWsIdentity(cred);
         state.lastRtcMode = cred.rtcMode || null;
         state.isSandbox = !!cred.isSandbox;
         state.slotStartMs = parseShanghaiStartMs(cred.startTime);
@@ -513,6 +522,7 @@
         var uid = Number(params.get("uid") || "10001");
         setPartnerLabel("搭档（连接中…）");
         cred = await fetchRtcToken(channelName, uid);
+        publishWsIdentity(cred);
       }
     } catch (e) {
       console.error(e);
@@ -550,7 +560,6 @@
         showWaitFlowForBooking(cred);
         if (state.slotStartMs && Date.now() < state.slotStartMs) {
           deferredWaiting = true;
-          showRoomToast("练习间已就绪；到达开场时间后将自动连接语音", false);
           scheduleDeferredWaitingJoin(areaToken);
         } else {
           joinedNow = await createJoinPublish(cred, areaToken);

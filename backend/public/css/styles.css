@@ -1675,6 +1675,81 @@ img {
   padding: 12px 14px 14px;
 }
 
+.room-extra--top {
+  margin-top: 0;
+  margin-bottom: 12px;
+}
+
+.room-role-banner {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 10px;
+}
+
+.room-role-banner .btn-swap {
+  flex-shrink: 0;
+  margin-top: 2px;
+}
+
+.room-role-banner__main {
+  min-width: 0;
+}
+
+.room-role-kicker {
+  font-size: 0.625rem;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: rgba(26, 92, 255, 0.9);
+  margin-bottom: 4px;
+}
+
+.room-role-my-name {
+  font-family: var(--font-serif);
+  font-size: 1.25rem;
+  font-weight: 700;
+  color: var(--text-primary);
+  line-height: 1.25;
+}
+
+.role-swap-hint {
+  margin: 0 0 12px;
+  padding: 10px 12px;
+  border-radius: 14px;
+  background: rgba(26, 92, 255, 0.08);
+  border: 1px solid rgba(26, 92, 255, 0.18);
+  font-size: 0.8125rem;
+  line-height: 1.5;
+  color: rgba(17, 24, 39, 0.72);
+}
+
+.role-swap-hint[hidden] {
+  display: none !important;
+}
+
+.role-brief {
+  margin: 0 0 12px;
+  padding: 12px 14px;
+  border-radius: 18px;
+  background: rgba(17, 24, 39, 0.04);
+  border: 1px solid rgba(17, 24, 39, 0.06);
+  font-size: 0.875rem;
+  line-height: 1.65;
+  color: rgba(17, 24, 39, 0.82);
+}
+
+.room-peer-role {
+  font-size: 0.8125rem;
+  color: var(--text-secondary);
+}
+
+.room-peer-role__label {
+  color: var(--text-muted);
+  margin-right: 4px;
+}
+
 .page-title-simple {
   margin: 0 0 18px;
   font-family: var(--font-serif);

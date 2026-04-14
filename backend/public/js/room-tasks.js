@@ -103,13 +103,41 @@
     return "r" + Date.now() + "-" + Math.random().toString(36).slice(2, 11);
   }
 
+  /** 预约进房时由 room-agora 在拿到 rtc-token-booking 后写入，避免仍用 URL 默认 channel/uid */
+  var wsIdentityOverride = null;
+
   function queryRoomIdentity() {
+    if (wsIdentityOverride && wsIdentityOverride.channel && wsIdentityOverride.uid != null) {
+      return {
+        channel: wsIdentityOverride.channel,
+        uid: Number(wsIdentityOverride.uid),
+      };
+    }
     var params = new URLSearchParams(window.location.search);
     return {
       channel: params.get("channel") || "demo_eng_local",
       uid: Number(params.get("uid") || "10001"),
     };
   }
+
+  /**
+   * @param {string} channel
+   * @param {number} uid
+   */
+  window.__roomWsSetChannelUid = function (channel, uid) {
+    if (!channel || uid == null || Number.isNaN(Number(uid))) return;
+    var next = { channel: String(channel), uid: Number(uid) };
+    var prev = wsIdentityOverride;
+    if (prev && prev.channel === next.channel && prev.uid === next.uid) return;
+    wsIdentityOverride = next;
+    if (ws) {
+      try {
+        ws.close();
+      } catch (_) {}
+    } else {
+      connectWs();
+    }
+  };
 
   function buildWsUrl() {
     var q = queryRoomIdentity();
@@ -194,6 +222,13 @@
       }
       if (!msg || typeof msg.type !== "string") return;
 
+      if (msg.type === "role_swap_peer_intent") {
+        if (typeof window.__handleRoleSwapPeerIntent === "function") {
+          window.__handleRoleSwapPeerIntent(msg);
+        }
+        return;
+      }
+
       if (msg.type === "task_confirm_prompt") {
         var title = String(msg.title || "");
         var requestId = msg.requestId;
@@ -222,6 +257,16 @@
       }
     };
   }
+
+  window.__roomSendRoleSwapIntent = function (wants) {
+    if (!wsReady || !ws || ws.readyState !== WebSocket.OPEN) return false;
+    try {
+      ws.send(JSON.stringify({ type: "role_swap_intent", wants: !!wants }));
+      return true;
+    } catch (e) {
+      return false;
+    }
+  };
 
   if (!list) return;
 

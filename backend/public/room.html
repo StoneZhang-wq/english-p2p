@@ -21,8 +21,32 @@
         <div class="room-timer" id="roomTimer">00:00</div>
       </header>
 
+      <details class="room-extra room-extra--top">
+        <summary>我的角色与场景（点击展开）</summary>
+        <div class="room-extra-inner">
+          <div class="room-role-banner">
+            <div class="room-role-banner__main">
+              <div class="room-role-kicker">当前扮演</div>
+              <div class="room-role-my-name" id="roleMyName">收银员</div>
+            </div>
+            <button type="button" class="btn-swap" id="btnSwap" title="与对方同时确认后互换角色">
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true">
+                <path d="M17 1l4 4-4 4" />
+                <path d="M3 11V9a4 4 0 0 1 4-4h14M7 23l-4-4 4-4" />
+                <path d="M21 13v2a4 4 0 0 1-4 4H3" />
+              </svg>
+              互换
+            </button>
+          </div>
+          <p class="role-swap-hint" id="roleSwapHint" hidden role="status"></p>
+          <div class="role-brief" id="roleMyBrief"></div>
+          <div class="room-peer-role">
+            <span class="room-peer-role__label">对方扮演：</span><span id="rolePeerName">客户</span>
+          </div>
+        </div>
+      </details>
+
       <div class="room-wait-flow" id="roomWaitFlow" hidden>
-        <p class="room-wait-flow__status" id="roomWaitStatus" role="status"></p>
         <button type="button" class="room-wait-flow__cta" id="roomWaitMatchBtn" hidden>
           已到练习时间，正在为你匹配语伴…
         </button>
@@ -124,31 +148,6 @@
           </div>
         </div>
       </div>
-
-      <details class="room-extra">
-        <summary>角色与讨论提示（展开）</summary>
-        <div class="room-extra-inner">
-          <div class="room-section-head">
-            <h3>角色扮演</h3>
-            <button type="button" class="btn-swap" id="btnSwap" title="互换显示（演示）">
-              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                <path d="M17 1l4 4-4 4" />
-                <path d="M3 11V9a4 4 0 0 1 4-4h14M7 23l-4-4 4-4" />
-                <path d="M21 13v2a4 4 0 0 1-4 4H3" />
-              </svg>
-              互换
-            </button>
-          </div>
-          <div class="role-row">
-            <div class="role-card active" id="roleMe">收银员</div>
-            <div class="role-card" id="rolePartner">客户</div>
-          </div>
-          <div class="prompts-head">讨论提示 · PROMPTS</div>
-          <div class="prompt-item">State clearly how much you want to withdraw.</div>
-          <div class="prompt-item">The teller may suggest alternatives — respond in English.</div>
-          <div class="prompt-item">Stay in role until subtasks are done or time is up.</div>
-        </div>
-      </details>
     </div>
 
     <div id="roomToast" class="room-toast" hidden role="status" aria-live="polite"></div>
@@ -189,21 +188,7 @@
     <script src="js/room.js"></script>
     <script src="js/room-practice-tasks.js"></script>
     <script src="js/room-tasks.js"></script>
-    <script>
-      (function () {
-        var swap = document.getElementById("btnSwap");
-        var a = document.getElementById("roleMe");
-        var b = document.getElementById("rolePartner");
-        if (!swap || !a || !b) return;
-        swap.addEventListener("click", function () {
-          var t = a.textContent;
-          a.textContent = b.textContent;
-          b.textContent = t;
-          a.classList.toggle("active");
-          b.classList.toggle("active");
-        });
-      })();
-    </script>
+    <script src="js/room-role-swap.js"></script>
     <script src="js/room-agora.js"></script>
   </body>
 </html>

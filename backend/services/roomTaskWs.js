@@ -117,6 +117,25 @@ function attachRoomTaskWebSocket(server) {
             })
           );
         }
+        return;
+      }
+
+      /** 角色互换意向：仅转发给同频道其他 uid，双方均点击「互换」后由各自前端同时执行互换 */
+      if (msg.type === "role_swap_intent") {
+        const room = rooms.get(meta.channel);
+        if (!room) return;
+        const wants = !!msg.wants;
+        const payload = JSON.stringify({
+          type: "role_swap_peer_intent",
+          fromUid: meta.uid,
+          wants,
+        });
+        for (const [otherUid, otherWs] of room) {
+          if (otherUid !== meta.uid && otherWs.readyState === WebSocket.OPEN) {
+            otherWs.send(payload);
+          }
+        }
+        return;
       }
     });
   });
