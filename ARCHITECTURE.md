@@ -170,6 +170,16 @@ CREATE TABLE credit_logs (
 | POST | `/api/agora/rtc-token` | Body：`{ channelName, uid }`；返回 `appId`、`channelName`、`token`、`uid`、`expiresIn`。**须开启声网 App Certificate**；**演示/联调用**，不校验预约（与 `rtc-token-booking` 区分） |
 | POST | `/api/agora/rtc-token-booking` | **须登录**。Body：`{ timeslot_id }`；校验当前用户在该场次有 `confirmed` 预约；若已存在包含本人的 `pairs` 则返回该 **1v1** `channel_name`，否则返回**同场等待大厅**频道名 `engw{timeslotId}`（`utils/agoraChannelNames.js`）；`uid` 取用户 id（须满足声网 uint32）；响应另含 **`startTime` / `endTime`**（`to_char` 上海 naive 字符串）与 **`rtcMode`**：`waiting` \| `paired`，供房间页开场文案与「匹配提示」按钮 |
 
+**管理员后台（最小可用）**：通过环境变量 `ADMIN_EMAILS`（逗号分隔 email 白名单）启用管理员身份；静态页 `public/admin.html`；接口统一前缀 `/api/admin/*`：
+
+| 方法 | 路径 | 说明 |
+|------|------|------|
+| GET | `/api/admin/timeslots` | Query：可选 `theme_id`；返回场次列表（含预约数、pairs 数） |
+| GET | `/api/admin/timeslots/:id/bookings` | 返回该场次 `confirmed` 预约用户（含 email/nickname/level） |
+| GET | `/api/admin/timeslots/:id/pairs` | 返回该场次 pairs 列表 |
+| POST | `/api/admin/timeslots/:id/pair` | Body：`{ user_a, user_b, force? }`；两人须均已预约该场次；`force=true` 时会先清掉该场次中涉及任一人的旧 pairs；随后插入一条新 pairs（频道名 `admin_eng_...`） |
+| POST | `/api/admin/timeslots/:id/unpair` | Body：`{ pair_id }`；删除该场次指定 pairs |
+
 **开发调试（非正式配对）**：当 `NODE_ENV !== 'production'` **或** `ENABLE_DEV_PAIRING=1` 时挂载 `routes/devPairing.js`（否则不注册该路径）：
 
 | 方法 | 路径 | 说明 |

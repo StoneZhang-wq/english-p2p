@@ -14,6 +14,7 @@ const agoraRouter = require("./routes/agora");
 const previewMaterialRouter = require("./routes/previewMaterial");
 const themesRouter = require("./routes/themes");
 const { attachRoomTaskWebSocket } = require("./services/roomTaskWs");
+const adminRouter = require("./routes/admin");
 
 function isDevPairingApiEnabled() {
   return process.env.ENABLE_DEV_PAIRING === "1" || process.env.NODE_ENV !== "production";
@@ -61,6 +62,7 @@ app.use("/api/cancel-booking", cancelBookingRouter);
 app.use("/api/agora", agoraRouter);
 app.use("/api/preview-material", previewMaterialRouter);
 app.use("/api/themes", themesRouter);
+app.use("/api/admin", adminRouter);
 
 if (isDevPairingApiEnabled()) {
   app.use("/api/dev", require("./routes/devPairing"));

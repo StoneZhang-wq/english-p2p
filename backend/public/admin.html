@@ -1,0 +1,179 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>管理员后台（简版）</title>
+    <link rel="stylesheet" href="css/styles.css" />
+    <style>
+      .admin-shell { max-width: 1100px; margin: 0 auto; padding: 20px; }
+      .admin-row { display: flex; gap: 10px; flex-wrap: wrap; align-items: end; }
+      .admin-row label { display: grid; gap: 6px; font-size: 13px; color: #cbd5e1; }
+      .admin-row input { padding: 10px 12px; border-radius: 10px; border: 1px solid rgba(148, 163, 184, 0.25); background: rgba(15, 23, 42, 0.6); color: #e2e8f0; min-width: 220px; }
+      .admin-row button { padding: 10px 14px; border-radius: 10px; border: 1px solid rgba(37, 99, 235, 0.65); background: rgba(37, 99, 235, 0.25); color: #e2e8f0; cursor: pointer; }
+      .admin-row button:hover { background: rgba(37, 99, 235, 0.35); }
+      pre { white-space: pre-wrap; background: rgba(2, 6, 23, 0.6); border: 1px solid rgba(148, 163, 184, 0.2); padding: 12px; border-radius: 12px; color: #e2e8f0; }
+      .admin-grid { display: grid; grid-template-columns: 1fr; gap: 16px; margin-top: 16px; }
+      .hint { color: #94a3b8; font-size: 13px; margin-top: 6px; }
+    </style>
+  </head>
+  <body class="page-room">
+    <div class="admin-shell">
+      <h2 style="margin: 0 0 10px 0; color: #e2e8f0">管理员后台（简版）</h2>
+      <div class="hint">
+        需先用普通页面登录（带 Cookie）。管理员白名单由后端环境变量 <code>ADMIN_EMAILS</code> 控制。
+      </div>
+
+      <div class="admin-grid">
+        <section class="room-tasks-panel">
+          <div class="room-tasks-head">
+            <h3 class="room-tasks-heading">1) 查看场次列表</h3>
+          </div>
+          <div class="admin-row">
+            <label>
+              theme_id（可选）
+              <input id="themeId" placeholder="例如 1（不填则列出最近 200 条）" />
+            </label>
+            <button id="btnLoadSlots">拉取 timeslots</button>
+          </div>
+          <pre id="outSlots">（等待操作）</pre>
+        </section>
+
+        <section class="room-tasks-panel">
+          <div class="room-tasks-head">
+            <h3 class="room-tasks-heading">2) 查看某场次预约/配对</h3>
+          </div>
+          <div class="admin-row">
+            <label>
+              timeslot_id
+              <input id="timeslotId" placeholder="例如 12" />
+            </label>
+            <button id="btnLoadBookings">拉取 bookings</button>
+            <button id="btnLoadPairs">拉取 pairs</button>
+          </div>
+          <pre id="outSlotDetail">（等待操作）</pre>
+        </section>
+
+        <section class="room-tasks-panel">
+          <div class="room-tasks-head">
+            <h3 class="room-tasks-heading">3) 手动配对/解除（调试用）</h3>
+          </div>
+          <div class="admin-row">
+            <label>
+              user_a
+              <input id="userA" placeholder="例如 101" />
+            </label>
+            <label>
+              user_b
+              <input id="userB" placeholder="例如 102" />
+            </label>
+            <label>
+              force（可选）
+              <input id="force" placeholder="true 或 false（不填默认为 false）" />
+            </label>
+            <button id="btnPair">创建配对</button>
+          </div>
+          <div class="admin-row" style="margin-top: 10px">
+            <label>
+              pair_id
+              <input id="pairId" placeholder="例如 5" />
+            </label>
+            <button id="btnUnpair">解除配对</button>
+          </div>
+          <pre id="outOps">（等待操作）</pre>
+        </section>
+      </div>
+    </div>
+
+    <script>
+      async function api(path, options) {
+        const res = await fetch(path, Object.assign({ credentials: "include" }, options || {}));
+        const txt = await res.text();
+        let json;
+        try { json = JSON.parse(txt); } catch { json = { raw: txt }; }
+        if (!res.ok) throw new Error((json && json.message) ? json.message : ("HTTP " + res.status));
+        return json;
+      }
+
+      function val(id) {
+        const el = document.getElementById(id);
+        return el ? String(el.value || "").trim() : "";
+      }
+
+      document.getElementById("btnLoadSlots").addEventListener("click", async function () {
+        const themeId = val("themeId");
+        const qs = themeId ? ("?theme_id=" + encodeURIComponent(themeId)) : "";
+        const out = document.getElementById("outSlots");
+        out.textContent = "加载中…";
+        try {
+          const json = await api("/api/admin/timeslots" + qs);
+          out.textContent = JSON.stringify(json, null, 2);
+        } catch (e) {
+          out.textContent = "失败：" + (e.message || e);
+        }
+      });
+
+      document.getElementById("btnLoadBookings").addEventListener("click", async function () {
+        const tid = val("timeslotId");
+        const out = document.getElementById("outSlotDetail");
+        out.textContent = "加载中…";
+        try {
+          const json = await api("/api/admin/timeslots/" + encodeURIComponent(tid) + "/bookings");
+          out.textContent = JSON.stringify(json, null, 2);
+        } catch (e) {
+          out.textContent = "失败：" + (e.message || e);
+        }
+      });
+
+      document.getElementById("btnLoadPairs").addEventListener("click", async function () {
+        const tid = val("timeslotId");
+        const out = document.getElementById("outSlotDetail");
+        out.textContent = "加载中…";
+        try {
+          const json = await api("/api/admin/timeslots/" + encodeURIComponent(tid) + "/pairs");
+          out.textContent = JSON.stringify(json, null, 2);
+        } catch (e) {
+          out.textContent = "失败：" + (e.message || e);
+        }
+      });
+
+      document.getElementById("btnPair").addEventListener("click", async function () {
+        const tid = val("timeslotId");
+        const userA = val("userA");
+        const userB = val("userB");
+        const forceRaw = val("force").toLowerCase();
+        const force = forceRaw === "true";
+        const out = document.getElementById("outOps");
+        out.textContent = "提交中…";
+        try {
+          const json = await api("/api/admin/timeslots/" + encodeURIComponent(tid) + "/pair", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ user_a: Number(userA), user_b: Number(userB), force: force }),
+          });
+          out.textContent = JSON.stringify(json, null, 2);
+        } catch (e) {
+          out.textContent = "失败：" + (e.message || e);
+        }
+      });
+
+      document.getElementById("btnUnpair").addEventListener("click", async function () {
+        const tid = val("timeslotId");
+        const pairId = val("pairId");
+        const out = document.getElementById("outOps");
+        out.textContent = "提交中…";
+        try {
+          const json = await api("/api/admin/timeslots/" + encodeURIComponent(tid) + "/unpair", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ pair_id: Number(pairId) }),
+          });
+          out.textContent = JSON.stringify(json, null, 2);
+        } catch (e) {
+          out.textContent = "失败：" + (e.message || e);
+        }
+      });
+    </script>
+  </body>
+</html>
+
