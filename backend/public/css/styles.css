@@ -1320,7 +1320,7 @@ img {
 .btn-swap {
   display: inline-flex;
   align-items: center;
-  gap: 4px;
+  gap: 6px;
   padding: 6px 10px;
   border-radius: 8px;
   border: 1px solid rgba(17, 24, 39, 0.1);
@@ -1328,6 +1328,31 @@ img {
   color: rgba(17, 24, 39, 0.75);
   font-size: 0.75rem;
   cursor: pointer;
+}
+
+.btn-swap.btn-swap--roles {
+  width: 100%;
+  box-sizing: border-box;
+  justify-content: center;
+  margin-top: 12px;
+  padding: 13px 18px;
+  border-radius: 999px;
+  border: none;
+  background: #0f172a;
+  color: #fff;
+  font-size: 0.6875rem;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  box-shadow: 0 10px 28px rgba(15, 23, 42, 0.22);
+}
+
+.btn-swap.btn-swap--roles:hover {
+  filter: brightness(1.06);
+}
+
+.btn-swap.btn-swap--roles:active {
+  transform: scale(0.99);
 }
 
 .role-row {
@@ -1779,46 +1804,61 @@ img {
   padding: 12px 14px 14px;
 }
 
-.room-extra--top {
-  margin-top: 0;
-  margin-bottom: 12px;
-}
-
 .room-dialogue {
   margin-top: 0;
   margin-bottom: 12px;
 }
 
 .room-dialogue summary {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
   font-size: 0.6875rem;
   font-weight: 700;
   letter-spacing: 0.06em;
   color: rgba(26, 92, 255, 0.9);
 }
 
+.room-dialogue summary::after {
+  content: "";
+  flex-shrink: 0;
+  width: 7px;
+  height: 7px;
+  margin-right: 2px;
+  border-right: 2px solid rgba(26, 92, 255, 0.55);
+  border-bottom: 2px solid rgba(26, 92, 255, 0.55);
+  transform: rotate(45deg);
+  transition: transform 0.2s ease;
+}
+
+.room-dialogue[open] summary::after {
+  transform: rotate(-135deg);
+  margin-top: 4px;
+}
+
+.room-dialogue__inner {
+  display: flex;
+  flex-direction: column;
+  gap: 0;
+  padding-bottom: 16px;
+}
+
 .room-dialogue-body {
-  margin: 0;
+  margin: 0 0 14px;
   font-size: 0.875rem;
   line-height: 1.65;
   color: rgba(17, 24, 39, 0.72);
   font-style: italic;
 }
 
-.room-role-banner {
-  display: flex;
-  align-items: flex-start;
-  justify-content: space-between;
-  gap: 12px;
-  margin-bottom: 10px;
-}
-
-.room-role-banner .btn-swap {
-  flex-shrink: 0;
-  margin-top: 2px;
-}
-
-.room-role-banner__main {
-  min-width: 0;
+.room-role-nested-card {
+  margin: 0;
+  padding: 14px 16px 16px;
+  border-radius: 24px;
+  border: 1px solid rgba(26, 92, 255, 0.32);
+  background: linear-gradient(180deg, rgba(26, 92, 255, 0.05) 0%, rgba(255, 255, 255, 0.72) 100%);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.65);
 }
 
 .room-role-kicker {
@@ -1827,19 +1867,38 @@ img {
   letter-spacing: 0.08em;
   text-transform: uppercase;
   color: rgba(26, 92, 255, 0.9);
-  margin-bottom: 4px;
+  margin-bottom: 6px;
 }
 
 .room-role-my-name {
   font-family: var(--font-serif);
-  font-size: 1.25rem;
+  font-size: 1.35rem;
   font-weight: 700;
   color: var(--text-primary);
-  line-height: 1.25;
+  line-height: 1.2;
+  margin-bottom: 2px;
+}
+
+.room-role-nested-card .role-brief {
+  margin: 10px 0 14px;
+  padding: 0;
+  border: none;
+  border-radius: 0;
+  background: transparent;
+  font-size: 0.875rem;
+  line-height: 1.65;
+  color: rgba(17, 24, 39, 0.78);
+}
+
+.room-role-nested-card .room-peer-role {
+  margin: 0;
+  padding-top: 12px;
+  border-top: 1px solid rgba(17, 24, 39, 0.08);
+  font-size: 0.8125rem;
 }
 
 .role-swap-hint {
-  margin: 0 0 12px;
+  margin: 12px 0 0;
   padding: 10px 12px;
   border-radius: 14px;
   background: rgba(26, 92, 255, 0.08);
