@@ -21,8 +21,17 @@
         <div class="room-timer" id="roomTimer">00:00</div>
       </header>
 
+      <details class="room-extra room-dialogue">
+        <summary>场景背景 · DIALOGUE BACKGROUND</summary>
+        <div class="room-extra-inner">
+          <p class="room-dialogue-body" id="roomDialogueBody">
+            【占位】一间安静的咖啡馆里，阳光落在木质桌面上，空气中飘着咖啡香。你可以自然开口，用英语完成下面的练习任务。
+          </p>
+        </div>
+      </details>
+
       <details class="room-extra room-extra--top">
-        <summary>我的角色与场景（点击展开）</summary>
+        <summary>我的角色 · YOUR ROLE（点击展开）</summary>
         <div class="room-extra-inner">
           <div class="room-role-banner">
             <div class="room-role-banner__main">
@@ -61,11 +70,46 @@
         </div>
       </div>
 
+      <div class="task-call-stage">
+        <details class="task-call-hint-details">
+          <summary>练习提示 · TASK HINT</summary>
+          <p class="task-call-hint">
+            实时语音通话中 · 点击「CLAIM」将通知对方，请对方确认你是否完成该任务
+          </p>
+        </details>
+        <div class="video-row video-row--compact">
+          <div class="video-tile video-tile--partner" id="tilePartner">
+            <div class="video-tile__media" id="remoteVideoSlot" aria-hidden="true"></div>
+            <div class="video-tile__standby">
+              <div class="avatar-placeholder" aria-hidden="true"></div>
+              <div class="label">搭档（连接中…）</div>
+            </div>
+          </div>
+          <div class="video-tile video-tile--self" id="tileSelf">
+            <div class="video-tile__media" id="localVideoSlot" aria-hidden="true"></div>
+            <span class="badge-me">我</span>
+          </div>
+        </div>
+      </div>
+
       <section class="room-tasks-panel" aria-labelledby="practiceTasksHeading">
         <div class="room-tasks-head">
           <h2 class="room-tasks-heading" id="practiceTasksHeading">
-            TASKS <span class="room-tasks-count" id="practiceTasksCount">(0/3)</span>
+            TASKS
+            <span class="room-tasks-count-wrap">
+              <span class="room-tasks-count" id="practiceTasksCount">0 / 6</span>
+              <span class="room-tasks-count-suffix">已完成</span>
+            </span>
           </h2>
+          <div class="task-pager" id="practiceTaskPager" role="navigation" aria-label="任务分页">
+            <button type="button" class="task-pager__btn" id="practiceTaskPrev" aria-label="上一任务">
+              ‹
+            </button>
+            <span class="task-pager__label" id="practiceTaskPagerLabel">1 / 6</span>
+            <button type="button" class="task-pager__btn" id="practiceTaskNext" aria-label="下一任务">
+              ›
+            </button>
+          </div>
           <div class="room-tasks-actions">
             <button type="button" class="room-tasks-icon-btn" id="practiceTasksRefresh" aria-label="刷新任务列表">
               <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true">
@@ -78,14 +122,14 @@
           </div>
         </div>
         <ul class="practice-task-list" id="practiceTaskList" aria-label="练习任务列表">
-          <li class="practice-task-card" data-task-id="p1">
+          <li class="practice-task-card is-task-active" data-task-id="p1">
             <div class="practice-task-row">
               <h3 class="practice-task-title">询问对方正在读的书</h3>
               <button type="button" class="practice-task-claim task-complete-btn">CLAIM</button>
             </div>
             <div class="practice-task-hints is-open">
               <button type="button" class="practice-task-hints-toggle" aria-expanded="true">
-                <span>USEFUL SENTENCES</span>
+                <span>HINTS · USEFUL SENTENCES</span>
                 <span class="practice-task-hints-chev" aria-hidden="true">▲</span>
               </button>
               <div class="practice-task-hints-body">
@@ -102,7 +146,7 @@
             </div>
             <div class="practice-task-hints">
               <button type="button" class="practice-task-hints-toggle" aria-expanded="false">
-                <span>USEFUL SENTENCES</span>
+                <span>HINTS · USEFUL SENTENCES</span>
                 <span class="practice-task-hints-chev" aria-hidden="true">▼</span>
               </button>
               <div class="practice-task-hints-body">
@@ -119,7 +163,7 @@
             </div>
             <div class="practice-task-hints">
               <button type="button" class="practice-task-hints-toggle" aria-expanded="false">
-                <span>USEFUL SENTENCES</span>
+                <span>HINTS · USEFUL SENTENCES</span>
                 <span class="practice-task-hints-chev" aria-hidden="true">▼</span>
               </button>
               <div class="practice-task-hints-body">
@@ -129,25 +173,59 @@
               </div>
             </div>
           </li>
+          <li class="practice-task-card" data-task-id="p4">
+            <div class="practice-task-row">
+              <h3 class="practice-task-title">【占位】简单寒暄并确认对方时间是否方便</h3>
+              <button type="button" class="practice-task-claim task-complete-btn">CLAIM</button>
+            </div>
+            <div class="practice-task-hints">
+              <button type="button" class="practice-task-hints-toggle" aria-expanded="false">
+                <span>HINTS · USEFUL SENTENCES</span>
+                <span class="practice-task-hints-chev" aria-hidden="true">▼</span>
+              </button>
+              <div class="practice-task-hints-body">
+                <p class="practice-hint-line">Hi, is this a good time for a quick chat?</p>
+                <p class="practice-hint-line">I don't want to interrupt if you're busy.</p>
+                <p class="practice-hint-line">Thanks for taking a moment to practice with me.</p>
+              </div>
+            </div>
+          </li>
+          <li class="practice-task-card" data-task-id="p5">
+            <div class="practice-task-row">
+              <h3 class="practice-task-title">【占位】就当前场景提出一个跟进问题</h3>
+              <button type="button" class="practice-task-claim task-complete-btn">CLAIM</button>
+            </div>
+            <div class="practice-task-hints">
+              <button type="button" class="practice-task-hints-toggle" aria-expanded="false">
+                <span>HINTS · USEFUL SENTENCES</span>
+                <span class="practice-task-hints-chev" aria-hidden="true">▼</span>
+              </button>
+              <div class="practice-task-hints-body">
+                <p class="practice-hint-line">Could you tell me a bit more about that?</p>
+                <p class="practice-hint-line">What would you recommend in this situation?</p>
+                <p class="practice-hint-line">I'm curious how you usually handle this.</p>
+              </div>
+            </div>
+          </li>
+          <li class="practice-task-card" data-task-id="p6">
+            <div class="practice-task-row">
+              <h3 class="practice-task-title">【占位】用一句话总结并礼貌收尾</h3>
+              <button type="button" class="practice-task-claim task-complete-btn">CLAIM</button>
+            </div>
+            <div class="practice-task-hints">
+              <button type="button" class="practice-task-hints-toggle" aria-expanded="false">
+                <span>HINTS · USEFUL SENTENCES</span>
+                <span class="practice-task-hints-chev" aria-hidden="true">▼</span>
+              </button>
+              <div class="practice-task-hints-body">
+                <p class="practice-hint-line">Thanks — that was really helpful.</p>
+                <p class="practice-hint-line">I appreciate you walking me through that.</p>
+                <p class="practice-hint-line">Have a great day, and enjoy your drink!</p>
+              </div>
+            </div>
+          </li>
         </ul>
       </section>
-
-      <div class="task-call-stage">
-        <p class="task-call-hint">实时语音通话中 · 点击「CLAIM」将通知对方，请对方确认你是否完成该任务</p>
-        <div class="video-row video-row--compact">
-          <div class="video-tile video-tile--partner" id="tilePartner">
-            <div class="video-tile__media" id="remoteVideoSlot" aria-hidden="true"></div>
-            <div class="video-tile__standby">
-              <div class="avatar-placeholder" aria-hidden="true"></div>
-              <div class="label">搭档（连接中…）</div>
-            </div>
-          </div>
-          <div class="video-tile video-tile--self" id="tileSelf">
-            <div class="video-tile__media" id="localVideoSlot" aria-hidden="true"></div>
-            <span class="badge-me">我</span>
-          </div>
-        </div>
-      </div>
     </div>
 
     <div id="roomToast" class="room-toast" hidden role="status" aria-live="polite"></div>

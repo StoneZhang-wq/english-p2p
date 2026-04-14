@@ -358,7 +358,7 @@ DOUBAO_API_KEY=
 | 配对（开场首轮 / 取消重配 / 停配 / 开场互配） | **部分**：`runAutoPairingScan` 开场窗口内贪心写 `pairs`；**通知、停配扫描、落单互配**仍待实现 |
 | 我的预约 | `GET /api/bookings/mine`：含 `LEFT JOIN pairs` 展示搭档昵称等（若库中已有配对行） |
 | Agora | `POST /api/agora/rtc-token-booking`：需登录 + 预约校验；`POST /api/agora/rtc-token` 仍为演示；生产可收紧 rtc-token |
-| 房间页 | `public/room.html`、`js/room-agora.js`（`timeslot_id` 轮询切频道）、`js/room-practice-tasks.js`（TASKS 列表、常用句折叠、演示刷新/模拟）、`js/room-tasks.js`（CLAIM + `role_swap_intent` 信令）、`js/room-role-swap.js`（角色与双方确认互换 UI）、`services/roomTaskWs.js` |
+| 房间页 | `public/room.html`、`js/room-agora.js`（`timeslot_id` 轮询切频道）、`js/room-practice-tasks.js`（TASKS 分页、单卡展示、HINTS 折叠、演示刷新/模拟、`__applyRoomTasksFromApi`）、`js/room-tasks.js`（CLAIM + `role_swap_intent` 信令）、`js/room-role-swap.js`（角色与双方确认互换 UI）、`services/roomTaskWs.js` |
 | 信用分结算 | `credit_logs` 表已建；**无** `POST /api/end-conversation` 等与产品一致的结算链路 |
 | 沙箱实验室 | 产品第 5.6 节、本文第 6.7 节 | **已有**：`is_sandbox`、`sandboxLab.js`、`dev-lab.html`、`GET/POST /api/dev/sandbox-*`、预约/场次/进房例外 |
 | LLM（OpenAI 兼容：豆包方舟等）写主题/预习/房间任务 | 产品第 8.3 节、本文第 6.8 节 | **已实现**：`services/llmChat.js`、`services/themeLlmEnrichment.js`；`OPENAI_*` / `MODEL_PROVIDER`；`themes.room_tasks_json`、`llm_generated_at`、`llm_prompt_version`；`rtc-token-booking` 返回 `roomTasks` |

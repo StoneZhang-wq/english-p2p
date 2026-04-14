@@ -1413,36 +1413,104 @@ img {
 
 /* —— 练习任务区（TASKS + 常用句 + CLAIM，与房间底栏控制配套） —— */
 .room-tasks-panel {
-  margin: 0 0 16px;
+  margin: 10px 0 16px;
 }
 
 .room-tasks-head {
   display: flex;
+  flex-wrap: wrap;
   align-items: center;
-  justify-content: space-between;
-  gap: 12px;
+  gap: 10px 12px;
   margin-bottom: 12px;
 }
 
 .room-tasks-heading {
   margin: 0;
+  flex: 1 1 160px;
+  min-width: 0;
   font-size: 0.8125rem;
   font-weight: 700;
   color: rgba(17, 24, 39, 0.75);
   letter-spacing: 0.06em;
   text-transform: uppercase;
+  line-height: 1.35;
+}
+
+.room-tasks-count-wrap {
+  display: inline;
+  text-transform: none;
+  letter-spacing: normal;
+  font-family: var(--font-serif);
+  font-weight: 700;
+  color: var(--text-primary);
+  margin-left: 6px;
+  font-variant-numeric: tabular-nums;
 }
 
 .room-tasks-count {
+  font-weight: 700;
+  color: var(--text-primary);
+}
+
+.room-tasks-count-suffix {
+  font-size: 0.75rem;
   font-weight: 600;
-  color: rgba(17, 24, 39, 0.45);
-  letter-spacing: 0.02em;
+  color: rgba(17, 24, 39, 0.5);
+  margin-left: 4px;
+}
+
+.task-pager {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  padding: 4px 8px;
+  border-radius: 14px;
+  background: rgba(17, 24, 39, 0.04);
+  border: 1px solid rgba(17, 24, 39, 0.08);
+  flex: 0 0 auto;
+}
+
+.task-pager__btn {
+  width: 36px;
+  height: 36px;
+  padding: 0;
+  border: none;
+  border-radius: 12px;
+  background: rgba(255, 255, 255, 0.95);
+  color: rgba(26, 92, 255, 0.95);
+  font-size: 1.25rem;
+  line-height: 1;
+  font-weight: 600;
+  cursor: pointer;
+  box-shadow: 0 4px 14px rgba(17, 24, 39, 0.08);
+  transition: opacity 0.15s, transform 0.1s;
+}
+
+.task-pager__btn:disabled {
+  opacity: 0.35;
+  cursor: not-allowed;
+  box-shadow: none;
+}
+
+.task-pager__btn:not(:disabled):active {
+  transform: scale(0.96);
+}
+
+.task-pager__label {
+  min-width: 3.25rem;
+  text-align: center;
+  font-size: 0.8125rem;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+  color: rgba(17, 24, 39, 0.75);
 }
 
 .room-tasks-actions {
   display: flex;
   align-items: center;
   gap: 8px;
+  margin-left: auto;
 }
 
 .room-tasks-icon-btn {
@@ -1486,9 +1554,13 @@ img {
   padding: 0;
 }
 
+.practice-task-list .practice-task-card:not(.is-task-active) {
+  display: none !important;
+}
+
 .practice-task-card {
   padding: 14px 16px;
-  margin-bottom: 10px;
+  margin-bottom: 0;
   background: var(--room-surface);
   border: 1px solid rgba(17, 24, 39, 0.08);
   border-radius: var(--radius-xl);
@@ -1635,6 +1707,38 @@ img {
   color: rgba(17, 24, 39, 0.55);
 }
 
+.task-call-hint-details {
+  width: 100%;
+  max-width: 100%;
+  border-radius: 18px;
+  border: 1px solid rgba(17, 24, 39, 0.08);
+  background: rgba(255, 255, 255, 0.55);
+  overflow: hidden;
+  margin-bottom: 8px;
+}
+
+.task-call-hint-details summary {
+  padding: 10px 14px;
+  font-size: 0.6875rem;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  color: rgba(26, 92, 255, 0.9);
+  cursor: pointer;
+  list-style: none;
+}
+
+.task-call-hint-details summary::-webkit-details-marker {
+  display: none;
+}
+
+.task-call-hint-details[open] summary {
+  border-bottom: 1px solid rgba(17, 24, 39, 0.08);
+}
+
+.task-call-hint-details .task-call-hint {
+  padding: 12px 14px 14px;
+}
+
 .video-row--compact {
   width: 100%;
   max-width: 320px;
@@ -1678,6 +1782,26 @@ img {
 .room-extra--top {
   margin-top: 0;
   margin-bottom: 12px;
+}
+
+.room-dialogue {
+  margin-top: 0;
+  margin-bottom: 12px;
+}
+
+.room-dialogue summary {
+  font-size: 0.6875rem;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  color: rgba(26, 92, 255, 0.9);
+}
+
+.room-dialogue-body {
+  margin: 0;
+  font-size: 0.875rem;
+  line-height: 1.65;
+  color: rgba(17, 24, 39, 0.72);
+  font-style: italic;
 }
 
 .room-role-banner {

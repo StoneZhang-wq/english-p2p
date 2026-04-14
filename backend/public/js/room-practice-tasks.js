@@ -1,11 +1,16 @@
 /**
- * 练习任务区：TASKS 计数、常用句折叠、刷新状态、模拟加载另一组演示任务。
+ * 练习任务区：TASKS 完成计数、任务分页（每次只展示一条）、常用句折叠、刷新、模拟任务集。
  */
 (function () {
   var list = document.getElementById("practiceTaskList");
   var countEl = document.getElementById("practiceTasksCount");
+  var pagerLabel = document.getElementById("practiceTaskPagerLabel");
+  var btnPrev = document.getElementById("practiceTaskPrev");
+  var btnNext = document.getElementById("practiceTaskNext");
   var refreshBtn = document.getElementById("practiceTasksRefresh");
   var simBtn = document.getElementById("practiceTasksSimulate");
+
+  var currentTaskIndex = 0;
 
   function showToast(msg, isError) {
     var el = document.getElementById("roomToast");
@@ -19,11 +24,39 @@
     }, 2800);
   }
 
+  function getTaskCards() {
+    if (!list) return [];
+    return Array.prototype.slice.call(list.querySelectorAll(".practice-task-card"));
+  }
+
   function updateTaskCount() {
     if (!list || !countEl) return;
-    var total = list.querySelectorAll(".practice-task-card").length;
-    var done = list.querySelectorAll(".practice-task-card.is-done").length;
-    countEl.textContent = "(" + done + "/" + total + ")";
+    var cards = getTaskCards();
+    var total = cards.length;
+    var done = cards.filter(function (c) {
+      return c.classList.contains("is-done");
+    }).length;
+    countEl.textContent = done + " / " + total;
+  }
+
+  function syncTaskPager() {
+    var cards = getTaskCards();
+    var n = cards.length;
+    if (n === 0) {
+      if (pagerLabel) pagerLabel.textContent = "0 / 0";
+      if (btnPrev) btnPrev.disabled = true;
+      if (btnNext) btnNext.disabled = true;
+      return;
+    }
+    if (currentTaskIndex >= n) currentTaskIndex = n - 1;
+    if (currentTaskIndex < 0) currentTaskIndex = 0;
+    cards.forEach(function (card, i) {
+      var on = i === currentTaskIndex;
+      card.classList.toggle("is-task-active", on);
+    });
+    if (pagerLabel) pagerLabel.textContent = currentTaskIndex + 1 + " / " + n;
+    if (btnPrev) btnPrev.disabled = currentTaskIndex <= 0;
+    if (btnNext) btnNext.disabled = currentTaskIndex >= n - 1;
   }
 
   function esc(s) {
@@ -61,6 +94,33 @@
         "No pressure — just let me know if it works for you.",
       ],
     },
+    {
+      id: "s4",
+      title: "【占位】确认对方是否方便继续聊几分钟",
+      hints: [
+        "Do you have a minute to keep chatting?",
+        "I can wrap up quickly if you need to go.",
+        "Thanks for being patient with my English.",
+      ],
+    },
+    {
+      id: "s5",
+      title: "【占位】请对方给一个简单建议或反馈",
+      hints: [
+        "What would you do if you were in my shoes?",
+        "I'd love to hear your honest feedback.",
+        "Is there anything I should phrase differently?",
+      ],
+    },
+    {
+      id: "s6",
+      title: "【占位】致谢并自然结束对话",
+      hints: [
+        "It was really nice talking with you.",
+        "Hope we can practice again sometime.",
+        "Take care, and have a lovely evening!",
+      ],
+    },
   ];
 
   function renderFromSet(items, openIndex) {
@@ -74,7 +134,9 @@
           })
           .join("");
         return (
-          '<li class="practice-task-card" data-task-id="' +
+          '<li class="practice-task-card' +
+          (i === 0 ? " is-task-active" : "") +
+          '" data-task-id="' +
           esc(t.id) +
           '">' +
           '<div class="practice-task-row">' +
@@ -89,9 +151,9 @@
           '<button type="button" class="practice-task-hints-toggle" aria-expanded="' +
           (isOpen ? "true" : "false") +
           '">' +
-          "<span>USEFUL SENTENCES</span>" +
+          "<span>HINTS · USEFUL SENTENCES</span>" +
           '<span class="practice-task-hints-chev" aria-hidden="true">' +
-          (isOpen ? "▲" : "▼") +
+          (isOpen ? "\u25b2" : "\u25bc") +
           "</span></button>" +
           '<div class="practice-task-hints-body">' +
           hints +
@@ -100,7 +162,9 @@
       })
       .join("");
     list.innerHTML = html;
+    currentTaskIndex = 0;
     updateTaskCount();
+    syncTaskPager();
   }
 
   function resetAllTaskLocks() {
@@ -114,20 +178,41 @@
         btn.classList.remove("is-waiting", "is-done");
       }
     });
+    currentTaskIndex = 0;
     updateTaskCount();
+    syncTaskPager();
   }
 
   if (list) {
     list.addEventListener("click", function (ev) {
       var toggle = ev.target.closest(".practice-task-hints-toggle");
       if (!toggle || !list.contains(toggle)) return;
+      var card = toggle.closest(".practice-task-card");
+      if (!card || !card.classList.contains("is-task-active")) return;
       ev.preventDefault();
       var wrap = toggle.closest(".practice-task-hints");
       if (!wrap) return;
       var open = wrap.classList.toggle("is-open");
       toggle.setAttribute("aria-expanded", open ? "true" : "false");
       var chev = toggle.querySelector(".practice-task-hints-chev");
-      if (chev) chev.textContent = open ? "▲" : "▼";
+      if (chev) chev.textContent = open ? "\u25b2" : "\u25bc";
+    });
+  }
+
+  if (btnPrev) {
+    btnPrev.addEventListener("click", function () {
+      if (currentTaskIndex <= 0) return;
+      currentTaskIndex -= 1;
+      syncTaskPager();
+    });
+  }
+
+  if (btnNext) {
+    btnNext.addEventListener("click", function () {
+      var n = getTaskCards().length;
+      if (currentTaskIndex >= n - 1) return;
+      currentTaskIndex += 1;
+      syncTaskPager();
     });
   }
 
@@ -145,7 +230,10 @@
     });
   }
 
-  window.__practiceTasksRefreshCount = updateTaskCount;
+  window.__practiceTasksRefreshCount = function () {
+    updateTaskCount();
+    syncTaskPager();
+  };
 
   /**
    * 由 room-agora 在 rtc-token-booking 返回 roomTasks 后调用；每项含 id、title（中文）、hints（英文数组）。
@@ -169,4 +257,5 @@
   };
 
   updateTaskCount();
+  syncTaskPager();
 })();
