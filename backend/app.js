@@ -68,7 +68,7 @@ if (isDevPairingApiEnabled()) {
   app.use("/api/dev", require("./routes/devPairing"));
   app.use("/api/dev", require("./routes/devThemeLlm"));
   console.warn(
-    "[dev] POST /api/dev/pair-timeslot、POST /api/dev/theme-llm-rerun 已启用（NODE_ENV 非 production 或 ENABLE_DEV_PAIRING=1）。生产环境请勿长期开启调试开关。"
+    "[dev] POST /api/dev/pair-timeslot、POST /api/dev/theme-llm-rerun、POST /api/dev/theme-llm-refresh-active 已启用（NODE_ENV 非 production 或 ENABLE_DEV_PAIRING=1）。生产环境请勿长期开启调试开关。"
   );
 }
 
