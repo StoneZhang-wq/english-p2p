@@ -75,9 +75,31 @@
             </label>
             <label>
               轮换池索引 pool_index
-              <input id="applyPoolIndex" placeholder="0 ～ N-1" />
+              <input id="applyPoolIndex" placeholder="0 ～ N-1（可选）" />
             </label>
-            <button id="btnApplyPoolIndex">套用轮换池种子</button>
+            <button id="btnApplyPoolIndex">套用轮换池种子（可选）</button>
+          </div>
+
+          <div class="admin-row" style="margin-top: 10px">
+            <label>
+              槽位 1 方向（theme_slot=0）
+              <input id="dir0" placeholder="例如：深层工作相关（面试/汇报/会议/跨部门沟通）" />
+            </label>
+            <button id="btnGen0">生成槽位1</button>
+          </div>
+          <div class="admin-row">
+            <label>
+              槽位 2 方向（theme_slot=1）
+              <input id="dir1" placeholder="例如：租房看房（押金/维修/入住）" />
+            </label>
+            <button id="btnGen1">生成槽位2</button>
+          </div>
+          <div class="admin-row">
+            <label>
+              槽位 3 方向（theme_slot=2）
+              <input id="dir2" placeholder="例如：客户投诉与协商（补偿/升级/致歉）" />
+            </label>
+            <button id="btnGen2">生成槽位3</button>
           </div>
           <div class="admin-row" style="margin-top: 10px">
             <button id="btnLlmRefreshActive">整批 LLM刷新（当前至多 3 主题）</button>
@@ -183,6 +205,56 @@
         } catch (e) {
           out.textContent = "失败：" + (e.message || e);
         }
+      });
+
+      function parseActiveThemesJson() {
+        const out = document.getElementById("outActiveThemes");
+        try {
+          const obj = JSON.parse(out.textContent);
+          return obj && obj.data && Array.isArray(obj.data.themes) ? obj.data.themes : [];
+        } catch {
+          return [];
+        }
+      }
+
+      async function generateSlot(slot, direction) {
+        const out = document.getElementById("outThemeOps");
+        const themes = parseActiveThemesJson();
+        const t = themes.find((x) => Number(x.themeSlot) === Number(slot));
+        if (!t || !t.id) {
+          out.textContent = "失败：请先点击「拉取当前活跃主题」，并确保存在 theme_slot=" + slot + " 的主题。";
+          return;
+        }
+        if (!direction) {
+          out.textContent = "失败：槽位方向不能为空";
+          return;
+        }
+        out.textContent = "提交中…（生成可能需数分钟，请勿重复点击）";
+        try {
+          const json = await api("/api/admin/themes/" + encodeURIComponent(String(t.id)) + "/generate-by-direction", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ direction }),
+          });
+          out.textContent = JSON.stringify(json, null, 2);
+          // 生成后自动刷新活跃主题预览
+          try {
+            const latest = await api("/api/admin/themes/active");
+            document.getElementById("outActiveThemes").textContent = JSON.stringify(latest, null, 2);
+          } catch {}
+        } catch (e) {
+          out.textContent = "失败：" + (e.message || e);
+        }
+      }
+
+      document.getElementById("btnGen0").addEventListener("click", function () {
+        generateSlot(0, val("dir0"));
+      });
+      document.getElementById("btnGen1").addEventListener("click", function () {
+        generateSlot(1, val("dir1"));
+      });
+      document.getElementById("btnGen2").addEventListener("click", function () {
+        generateSlot(2, val("dir2"));
       });
 
       document.getElementById("btnLoadSlots").addEventListener("click", async function () {

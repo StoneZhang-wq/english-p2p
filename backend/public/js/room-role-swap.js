@@ -5,14 +5,8 @@
 (function () {
   var myRoleName = "收银员";
   var peerRoleName = "客户";
-
-  /** 占位：后续可由主题 / AI 生成替换 */
-  var ROLE_BRIEF = {
-    收银员:
-      "【占位】你在柜台内侧负责接待这位客户。当前背景：网点营业中，对方需要办理业务。你的工作是按流程接待、询问与确认需求，并全程尽量使用英语沟通。",
-    客户:
-      "【占位】你作为客户来到柜台办理业务。当前背景：网点营业中，你需要向工作人员说明诉求并配合必要问询。你的工作是表达清楚需求、回答问题，并尽量使用英语完成沟通。",
-  };
+  var roleBriefByName = {};
+  var themeRoles = [];
 
   var myWantsSwap = false;
   var peerWantsSwap = false;
@@ -37,8 +31,9 @@
 
   function renderBrief() {
     if (!elBrief) return;
-    var text = ROLE_BRIEF[myRoleName];
-    elBrief.textContent = text || "【占位】请根据当前扮演角色，结合场景完成口语练习。（后续由系统生成更贴合主题的说明）";
+    var text = roleBriefByName[myRoleName];
+    elBrief.textContent =
+      text || "【占位】请根据当前扮演角色，结合场景完成口语练习。（后续由系统生成更贴合主题的说明）";
   }
 
   function renderNames() {
@@ -76,6 +71,9 @@
     myWantsSwap = false;
     peerWantsSwap = false;
     renderNames();
+    if (typeof window.__roomOnRoleChanged === "function") {
+      window.__roomOnRoleChanged(myRoleName, peerRoleName);
+    }
     if (typeof window.__roomSendRoleSwapIntent === "function") {
       window.__roomSendRoleSwapIntent(false);
     }
@@ -113,6 +111,37 @@
       tryExecuteSwap();
     });
   }
+
+  function setRolesFromTheme(roles) {
+    if (!Array.isArray(roles) || roles.length < 2) return;
+    themeRoles = roles.slice(0, 2);
+    var aName = String(themeRoles[0].name || "").trim();
+    var bName = String(themeRoles[1].name || "").trim();
+    if (aName && bName) {
+      // 默认：本端先取第一个角色；如需更严格分配可在后端加字段。
+      myRoleName = aName;
+      peerRoleName = bName;
+    }
+    roleBriefByName = {};
+    themeRoles.forEach(function (r) {
+      var n = String(r.name || "").trim();
+      var d = String(r.desc || "").trim();
+      if (n && d) roleBriefByName[n] = d;
+    });
+    renderNames();
+    updateHint();
+    if (typeof window.__roomOnRoleChanged === "function") {
+      window.__roomOnRoleChanged(myRoleName, peerRoleName);
+    }
+  }
+
+  window.__roomSetThemeRoles = function (roles) {
+    setRolesFromTheme(roles);
+  };
+
+  window.__roomGetMyRoleName = function () {
+    return myRoleName;
+  };
 
   renderNames();
   updateHint();

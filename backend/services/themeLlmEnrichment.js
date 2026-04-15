@@ -6,7 +6,7 @@
 
 const { chatCompletionText, isLlmConfigured } = require("./llmChat");
 
-const PROMPT_VERSION = "theme_pack_v2";
+const PROMPT_VERSION = "theme_pack_v3";
 
 /** 去重参考：最近 N 条（非当前批次）主题 */
 const DEDUP_THEME_LIMIT = 12;
@@ -85,6 +85,20 @@ function normalizeRoomTasksToSix(room_tasks) {
   return dedupeTaskIds(tasks);
 }
 
+function normalizeRoomTasksByRoleToSix(byRole, roleNames) {
+  if (!byRole || typeof byRole !== "object") return null;
+  if (!Array.isArray(roleNames) || roleNames.length !== 2) return null;
+  var out = {};
+  for (var i = 0; i < roleNames.length; i++) {
+    var rn = roleNames[i];
+    var raw = byRole[rn];
+    var normalized = normalizeRoomTasksToSix(raw);
+    if (!normalized || normalized.length !== ROOM_TASKS_TARGET) return null;
+    out[rn] = normalized;
+  }
+  return out;
+}
+
 function validatePack(obj) {
   if (!obj || typeof obj !== "object") return null;
   var name = String(obj.name || "").trim();
@@ -109,8 +123,22 @@ function validatePack(obj) {
   var cover_url = String(obj.cover_url || "").trim();
   if (!cover_url || !/^https?:\/\//i.test(cover_url)) return null;
 
-  var room_tasks = normalizeRoomTasksToSix(obj.room_tasks);
-  if (!room_tasks || room_tasks.length !== ROOM_TASKS_TARGET) return null;
+  var roleNames = [roles[0].name, roles[1].name].map(function (x) {
+    return String(x || "").trim();
+  });
+
+  var roomTasksPayload = null;
+  // v3：按角色拆分任务集
+  if (obj.room_tasks_by_role != null) {
+    var by = normalizeRoomTasksByRoleToSix(obj.room_tasks_by_role, roleNames);
+    if (!by) return null;
+    roomTasksPayload = { version: 3, byRole: by };
+  } else {
+    // v2/v1：单一任务集（仍兼容）
+    var room_tasks = normalizeRoomTasksToSix(obj.room_tasks);
+    if (!room_tasks || room_tasks.length !== ROOM_TASKS_TARGET) return null;
+    roomTasksPayload = room_tasks;
+  }
 
   var difficulty_level = ["beginner", "intermediate", "advanced"].includes(String(obj.difficulty_level))
     ? String(obj.difficulty_level)
@@ -124,7 +152,7 @@ function validatePack(obj) {
     preview_markdown: preview_markdown,
     cover_url: cover_url,
     difficulty_level: difficulty_level,
-    room_tasks: room_tasks,
+    room_tasks_payload: roomTasksPayload,
   };
 }
 
@@ -180,6 +208,7 @@ async function fetchRecentThemeDedupContext(pool, excludeIds) {
 async function generateThemePack(seed, options) {
   options = options || {};
   var recentDedup = Array.isArray(options.recentDedup) ? options.recentDedup : [];
+  var direction = options.direction ? String(options.direction).trim() : "";
 
   var roles = safeParseRoles(seed.roles_json);
   var seedJson = JSON.stringify(
@@ -227,10 +256,14 @@ async function generateThemePack(seed, options) {
     "  `# 学习目标` `# 核心词汇` `# 实用句型` `# 情景对话示例` `# 常见误区` `# 自练清单`\n" +
     "其中「核心词汇」「实用句型」要足够具体；**英文例句**用英文；总长度建议明显长于短文。\n" +
     "- cover_url：必须是可公网访问的 **https** 图片 URL；若不确定可用 Unsplash 与场景相关的图片 URL（模型仍需输出合法 URL；落库时可能保留种子封面）。\n" +
-    "- room_tasks：输出 **5～7** 条（推荐 6条）。每条 title 为**中文**练习任务；hints 为 **3～5** 条**英文**常用句，口语难度与 difficulty_level 一致；任务之间递进、避免重复问法。\n" +
+    "- room_tasks：若不提供 room_tasks_by_role，则输出 **5～7** 条（推荐 6条）。每条 title 为**中文**练习任务；hints 为 **3～5** 条**英文**常用句，口语难度与 difficulty_level 一致；任务之间递进、避免重复问法。\n" +
+    "- room_tasks_by_role（推荐使用）：按角色名拆分任务：{ \"角色名A\": Task[], \"角色名B\": Task[] }；每个数组输出 **5～7** 条，服务端会规范成 6 条落库。\n" +
     "- 在种子基础上**改写增强**，不要逐字复制种子正文。";
 
-  var user = "以下为当前周主题种子（JSON）。请生成最终上架内容：" + dedupBlock + "\n\n" + seedJson;
+  var directionBlock = direction
+    ? "\n\n【管理员指定方向】你必须将本主题生成结果严格围绕以下方向/关键词展开：\n" + direction
+    : "";
+  var user = "以下为当前周主题种子（JSON）。请生成最终上架内容：" + dedupBlock + directionBlock + "\n\n" + seedJson;
 
   var msgs = [
     { role: "system", content: system },
@@ -320,7 +353,7 @@ async function tryEnrichThemesWithLlm(pool) {
           pack.preview_markdown,
           pack.cover_url,
           pack.difficulty_level,
-          JSON.stringify(pack.room_tasks),
+          JSON.stringify(pack.room_tasks_payload),
           PROMPT_VERSION,
           row.id,
         ]
@@ -426,7 +459,7 @@ async function refreshActiveThemesWithLlmBody(pool) {
           pack.preview_markdown,
           pack.cover_url,
           pack.difficulty_level,
-          JSON.stringify(pack.room_tasks),
+          JSON.stringify(pack.room_tasks_payload),
           PROMPT_VERSION,
           row.id,
         ]
@@ -524,7 +557,7 @@ async function rerunThemeLlmForDev(pool, themeId) {
       pack.preview_markdown,
       pack.cover_url,
       pack.difficulty_level,
-      JSON.stringify(pack.room_tasks),
+      JSON.stringify(pack.room_tasks_payload),
       PROMPT_VERSION,
       tid,
     ]
@@ -543,7 +576,7 @@ module.exports = {
   tryEnrichThemesWithLlm,
   rerunThemeLlmForDev,
   refreshActiveThemesWithLlm,
-  fetchRecentThemeDedupContext,
   generateThemePack,
+  fetchRecentThemeDedupContext,
   PROMPT_VERSION,
 };

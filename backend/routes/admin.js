@@ -2,7 +2,7 @@ const express = require("express");
 const { getPool } = require("../db");
 const { requireAdmin } = require("../middleware/requireAdmin");
 const { POOL } = require("../data/themeRotationPool");
-const { refreshActiveThemesWithLlm } = require("../services/themeLlmEnrichment");
+const { refreshActiveThemesWithLlm, generateThemePack, fetchRecentThemeDedupContext, PROMPT_VERSION } = require("../services/themeLlmEnrichment");
 
 const router = express.Router();
 
@@ -251,6 +251,103 @@ router.post("/themes/llm-refresh-active", requireAdmin, async (_req, res) => {
       return res.status(409).json({ code: 409, message: e.message, data: null });
     }
     console.error("[admin] POST themes/llm-refresh-active", e);
+    const msg = e && e.message ? e.message : "服务器错误";
+    return res.status(500).json({ code: 500, message: msg, data: null });
+  }
+});
+
+// POST /api/admin/themes/:id/generate-by-direction  Body: { direction: string }
+router.post("/themes/:id/generate-by-direction", requireAdmin, async (req, res) => {
+  const themeId = Number(req.params.id);
+  const direction = String(req.body?.direction || "").trim();
+  if (!themeId || Number.isNaN(themeId)) {
+    return res.status(400).json({ code: 400, message: "theme id 无效", data: null });
+  }
+  if (!direction || direction.length > 200) {
+    return res.status(400).json({ code: 400, message: "direction 不能为空且长度≤200", data: null });
+  }
+  try {
+    const pool = getPool();
+    const { rows } = await pool.query(
+      `SELECT id, name, description, scene_text, roles_json, cover_url, preview_markdown, difficulty_level, theme_slot,
+              shanghai_week_monday::text AS week_monday
+       FROM themes
+       WHERE id = $1 AND is_active = 1 AND COALESCE(is_sandbox, FALSE) = FALSE AND shanghai_week_monday IS NOT NULL
+       LIMIT 1`,
+      [themeId]
+    );
+    const row = rows[0];
+    if (!row) {
+      return res.status(404).json({ code: 404, message: "主题不存在或非当前上架正式主题", data: null });
+    }
+    const recentDedup = await fetchRecentThemeDedupContext(pool, [themeId]);
+    const pack = await generateThemePack(
+      {
+        name: row.name,
+        description: row.description || "",
+        scene_text: row.scene_text || "",
+        roles_json: row.roles_json,
+        preview_markdown: row.preview_markdown || "",
+        cover_url: row.cover_url || "",
+        difficulty_level: row.difficulty_level || "intermediate",
+        theme_slot: Number(row.theme_slot),
+        week_monday: row.week_monday || "",
+      },
+      { recentDedup, direction }
+    );
+
+    const upd = await pool.query(
+      `UPDATE themes SET
+         name = $1,
+         description = $2,
+         scene_text = $3,
+         roles_json = $4,
+         preview_markdown = $5,
+         cover_url = $6,
+         difficulty_level = $7,
+         room_tasks_json = $8::jsonb,
+         llm_generated_at = NOW(),
+         llm_prompt_version = $9
+       WHERE id = $10`,
+      [
+        pack.name,
+        pack.description,
+        pack.scene_text,
+        pack.roles_json,
+        pack.preview_markdown,
+        pack.cover_url,
+        pack.difficulty_level,
+        JSON.stringify(pack.room_tasks_payload),
+        PROMPT_VERSION || "theme_pack_v3",
+        themeId,
+      ]
+    );
+    if (upd.rowCount !== 1) {
+      return res.status(500).json({ code: 500, message: "更新主题失败", data: null });
+    }
+    res.json({
+      code: 0,
+      message: "ok",
+      data: {
+        themeId,
+        direction,
+        theme: {
+          name: pack.name,
+          description: pack.description,
+          sceneText: pack.scene_text,
+          roles: JSON.parse(pack.roles_json),
+          previewMarkdown: pack.preview_markdown,
+          roomTasks: pack.room_tasks_payload,
+          llmPromptVersion: PROMPT_VERSION,
+        },
+      },
+    });
+  } catch (e) {
+    const code = e && e.code;
+    if (code === "LLM_NOT_CONFIGURED") {
+      return res.status(503).json({ code: 503, message: e.message, data: null });
+    }
+    console.error("[admin] POST themes/generate-by-direction", e);
     const msg = e && e.message ? e.message : "服务器错误";
     return res.status(500).json({ code: 500, message: msg, data: null });
   }

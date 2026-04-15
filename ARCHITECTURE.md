@@ -182,6 +182,7 @@ CREATE TABLE credit_logs (
 | GET | `/api/admin/themes/active` | 当前 `is_active` 的正式周主题**至多 3 条**（含 id、槽位、周、LLM 版本摘要） |
 | GET | `/api/admin/themes/pool` | `themeRotationPool.js` 轮换池**索引列表**（供套用种子） |
 | POST | `/api/admin/themes/:id/apply-pool-index` | Body：`{ pool_index }`（整数）。将 `POOL[pool_index]` 写入该主题的种子字段，并清空 `llm_generated_at` / `room_tasks_json`；**仅**当该行 `is_active=1` 且非沙箱 |
+| POST | `/api/admin/themes/:id/generate-by-direction` | Body：`{ direction }`（字符串）。管理员为该主题指定“方向/关键词”（如“深层工作相关”），服务端以 v3 提示词生成整包内容并写回；生成后可在 `admin.html` 预览写入结果。 |
 | POST | `/api/admin/themes/llm-refresh-active` | 无 Body。与 `POST /api/dev/theme-llm-refresh-active` 同逻辑，**须 `ADMIN_EMAILS`**，**生产可用**；并发第二次返回 **409**（`REFRESH_IN_PROGRESS`） |
 
 **开发调试（非正式配对）**：当 `NODE_ENV !== 'production'` **或** `ENABLE_DEV_PAIRING=1` 时挂载 `routes/devPairing.js`（否则不注册该路径）：
@@ -272,15 +273,15 @@ CREATE TABLE credit_logs (
 
 ### 6.8 LLM 内容生成（OpenAI 兼容接口，与 `docs/产品描述.md` 第 8.3 节一致）
 
-**目标**：主题名、描述、场景、角色、**更丰满的**预习 Markdown、**房间内 6 条任务 + 英文 hints** 由服务端调用 **OpenAI Chat Completions 兼容** API（豆包方舟等）生成后**落库**；**`cover_url`** 以轮换池写入为准，LLM 批处理与刷新接口**不替换**封面 URL。前端通过 `GET /api/themes/by-id` 与 **`POST /api/agora/rtc-token-booking`** 的 `roomTasks` 字段读取。
+**目标**：主题名、描述、场景、角色、**更丰满的**预习 Markdown、房间任务（英文 hints）由服务端调用 **OpenAI Chat Completions 兼容** API（豆包方舟等）生成后**落库**；**`cover_url`** 以轮换池写入为准，LLM 批处理与刷新接口**不替换**封面 URL。前端通过 `GET /api/themes/by-id` 与 **`POST /api/agora/rtc-token-booking`** 的 `theme` / `roomTasks` 字段读取。
 
 **已实现**：
 
 | 项 | 实现 |
 |----|------|
 | 凭据与端点 | 环境变量 **`OPENAI_API_KEY`**、**`OPENAI_BASE_URL`**（可填完整 `.../chat/completions` 或只填 `https://ark.../api/v3`）、**`OPENAI_MODEL`**（方舟常为 `ep-xxxx`）；可选 **`MODEL_PROVIDER`**（日志用，如 `doubao`） |
-| 服务模块 | `services/llmChat.js`（HTTP `fetch`）、`services/themeLlmEnrichment.js`（`theme_pack_v2` 提示词、JSON 校验、`tryEnrichThemesWithLlm`、`refreshActiveThemesWithLlm`、`rerunThemeLlmForDev`；生成时注入**最近 12 个主题**场景摘录以避免撞场景） |
-| 存储 | `themes.room_tasks_json`（JSONB，**6** 条任务）、`themes.llm_generated_at`、`themes.llm_prompt_version`；其余覆盖 `name`、`description`、`scene_text`、`roles_json`、`preview_markdown`、`difficulty_level`；**`cover_url` 在 LLM 写回时用种子行原值保留** |
+| 服务模块 | `services/llmChat.js`（HTTP `fetch`）、`services/themeLlmEnrichment.js`（`theme_pack_v3`：支持管理员指定方向；JSON 校验；`tryEnrichThemesWithLlm`、`refreshActiveThemesWithLlm`、`rerunThemeLlmForDev`；生成时注入**最近 12 个主题**场景摘录以避免撞场景） |
+| 存储 | `themes.room_tasks_json`（JSONB：v3 推荐形态 `{ version: 3, byRole: { [roleName]: Task[6] } }`，每角色 6 条；兼容旧数组形态）、`themes.llm_generated_at`、`themes.llm_prompt_version`；其余覆盖 `name`、`description`、`scene_text`、`roles_json`、`preview_markdown`、`difficulty_level`；**`cover_url` 在 LLM 写回时用种子行原值保留** |
 | 触发 | **`initDb` 结束后**尝试一轮；**`runWeeklyThemeMaintenance`（每 10 分钟）**后再尝试；每次最多 **3** 条 `llm_generated_at IS NULL` 且**非沙箱**的周主题 |
 | 整批刷新当前周 | **推荐生产**：**`POST /api/admin/themes/llm-refresh-active`**（须 `ADMIN_EMAILS`）。**调试**：`POST /api/dev/theme-llm-refresh-active`（须 `ENABLE_DEV_PAIRING=1` 或非 production）。对当前 `is_active` 的至多 **3** 条正式主题顺序重生成；**并发第二次409**（`REFRESH_IN_PROGRESS`） |
 | 房间展示 | `room-agora.js` 首次 `rtc-token-booking` 成功后调用 `window.__applyRoomTasksFromApi(roomTasks)`；无 `room_tasks_json` 时保留 `room.html` 默认静态任务 |

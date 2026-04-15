@@ -239,9 +239,30 @@
    * 由 room-agora 在 rtc-token-booking 返回 roomTasks 后调用；每项含 id、title（中文）、hints（英文数组）。
    */
   window.__applyRoomTasksFromApi = function (tasks) {
-    if (!list || !Array.isArray(tasks) || tasks.length === 0) return;
+    if (!list || !tasks) return;
+    window.__lastRoomTasksPayload = tasks;
+    // 支持两种形态：
+    // 1) v1: tasks 为数组（同一套任务）
+    // 2) v2: tasks 为对象 { version: 2, byRole: { [roleName]: Task[] } }
+    var chosen = null;
+    if (Array.isArray(tasks)) {
+      chosen = tasks;
+    } else if (typeof tasks === "object") {
+      var byRole = tasks.byRole || tasks.by_role || tasks.by_role_name;
+      if (byRole && typeof byRole === "object") {
+        var roleName = typeof window.__roomGetMyRoleName === "function" ? window.__roomGetMyRoleName() : null;
+        if (roleName && Array.isArray(byRole[roleName])) {
+          chosen = byRole[roleName];
+        } else {
+          // 兜底：取第一个角色的任务
+          var keys = Object.keys(byRole);
+          if (keys.length && Array.isArray(byRole[keys[0]])) chosen = byRole[keys[0]];
+        }
+      }
+    }
+    if (!Array.isArray(chosen) || chosen.length === 0) return;
     var DESIRED_TOTAL = 6;
-    var normalized = tasks
+    var normalized = chosen
       .map(function (t) {
         return {
           id: String(t.id || ""),
@@ -281,6 +302,13 @@
     }
     renderFromSet(next, 0);
     showToast("已加载本主题的练习任务", false);
+  };
+
+  // 当角色互换后，若后端提供的是按角色拆分的任务集，则需要重新选择并渲染。
+  window.__roomOnRoleChanged = function () {
+    if (window.__lastRoomTasksPayload) {
+      window.__applyRoomTasksFromApi(window.__lastRoomTasksPayload);
+    }
   };
 
   updateTaskCount();

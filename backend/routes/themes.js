@@ -35,7 +35,6 @@ router.get("/by-id", async (req, res) => {
       try {
         const raw = r.room_tasks_json;
         roomTasks = typeof raw === "string" ? JSON.parse(raw) : raw;
-        if (!Array.isArray(roomTasks)) roomTasks = null;
       } catch {
         roomTasks = null;
       }

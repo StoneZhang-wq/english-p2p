@@ -226,6 +226,22 @@
     return json.data;
   }
 
+  function applyThemeContent(theme) {
+    if (!theme || typeof theme !== "object") return;
+    var titleEl = document.getElementById("roomTopicTitle");
+    if (titleEl && theme.name) titleEl.textContent = String(theme.name);
+    var dialogueEl = document.getElementById("roomDialogueBody");
+    if (dialogueEl && theme.sceneText) dialogueEl.textContent = String(theme.sceneText);
+    if (Array.isArray(theme.roles) && theme.roles.length >= 2) {
+      if (typeof window.__roomSetThemeRoles === "function") {
+        window.__roomSetThemeRoles(theme.roles);
+      }
+    }
+    if (typeof window.__roomSetThemeMeta === "function") {
+      window.__roomSetThemeMeta(theme);
+    }
+  }
+
   function attachClientHandlers(client) {
     client.on("user-published", async function (user, mediaType) {
       try {
@@ -508,6 +524,9 @@
         state.isSandbox = !!cred.isSandbox;
         state.slotStartMs = parseShanghaiStartMs(cred.startTime);
         state.slotEndMs = parseShanghaiStartMs(cred.endTime);
+        if (cred.theme) {
+          applyThemeContent(cred.theme);
+        }
         if (!state.roomTasksApplied && cred.roomTasks && typeof window.__applyRoomTasksFromApi === "function") {
           state.roomTasksApplied = true;
           window.__applyRoomTasksFromApi(cred.roomTasks);

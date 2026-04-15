@@ -45,7 +45,12 @@ router.post("/rtc-token-booking", requireAuth, async (req, res) => {
               to_char(t.start_time, 'YYYY-MM-DD HH24:MI:SS') AS start_time,
               to_char(t.end_time, 'YYYY-MM-DD HH24:MI:SS') AS end_time,
               COALESCE(th.is_sandbox, FALSE) AS is_sandbox,
-              th.room_tasks_json
+              th.room_tasks_json,
+              th.name AS theme_name,
+              th.description AS theme_description,
+              th.scene_text AS theme_scene_text,
+              th.roles_json AS theme_roles_json,
+              th.preview_markdown AS theme_preview_markdown
        FROM timeslots t
        JOIN themes th ON th.id = t.theme_id
        WHERE t.id = $1 LIMIT 1`,
@@ -58,10 +63,18 @@ router.post("/rtc-token-booking", requireAuth, async (req, res) => {
       try {
         const raw = slot.room_tasks_json;
         roomTasks = typeof raw === "string" ? JSON.parse(raw) : raw;
-        if (!Array.isArray(roomTasks)) roomTasks = null;
       } catch {
         roomTasks = null;
       }
+    }
+
+    let themeRoles = [];
+    try {
+      const rawRoles = slot.theme_roles_json;
+      const parsed = typeof rawRoles === "string" ? JSON.parse(rawRoles) : rawRoles;
+      themeRoles = Array.isArray(parsed) ? parsed : [];
+    } catch {
+      themeRoles = [];
     }
 
     const result = buildRtcToken(channelName, uid);
@@ -81,6 +94,14 @@ router.post("/rtc-token-booking", requireAuth, async (req, res) => {
         endTime: slot.end_time || null,
         isSandbox,
         roomTasks,
+        theme: {
+          id: slot.theme_id != null ? Number(slot.theme_id) : null,
+          name: slot.theme_name || null,
+          description: slot.theme_description || null,
+          sceneText: slot.theme_scene_text || null,
+          roles: themeRoles,
+          previewMarkdown: slot.theme_preview_markdown || "",
+        },
       },
     });
   } catch (e) {
