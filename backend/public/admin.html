@@ -78,6 +78,24 @@
 
         <section class="room-tasks-panel">
           <div class="room-tasks-head">
+            <h3 class="room-tasks-heading">1.5) 清理历史场次（删除）</h3>
+          </div>
+          <div class="hint">
+            会删除<strong>已结束</strong>且早于保留天数的场次，并同时删除关联的 bookings / pairs。建议先预览，再确认删除。
+          </div>
+          <div class="admin-row">
+            <label>
+              保留天数 retention_days
+              <input id="retentionDays" placeholder="默认 30（范围 1～365）" />
+            </label>
+            <button id="btnHistoryPreview">预览将删除多少</button>
+            <button id="btnHistoryDelete">确认删除历史场次</button>
+          </div>
+          <pre id="outHistoryCleanup">（等待操作）</pre>
+        </section>
+
+        <section class="room-tasks-panel">
+          <div class="room-tasks-head">
             <h3 class="room-tasks-heading">2) 查看某场次预约/配对</h3>
           </div>
           <div class="admin-row">
@@ -567,6 +585,34 @@
         } catch (e) {
           out.textContent = "失败：" + (e.message || e);
           if (outRaw) outRaw.textContent = "失败：" + (e.message || e);
+        }
+      });
+
+      document.getElementById("btnHistoryPreview").addEventListener("click", async function () {
+        const out = document.getElementById("outHistoryCleanup");
+        const days = val("retentionDays") || "30";
+        out.textContent = "加载中…";
+        try {
+          const json = await api("/api/admin/timeslots/history-preview?retention_days=" + encodeURIComponent(days));
+          out.textContent = JSON.stringify(json, null, 2);
+        } catch (e) {
+          out.textContent = "失败：" + (e.message || e);
+        }
+      });
+
+      document.getElementById("btnHistoryDelete").addEventListener("click", async function () {
+        const out = document.getElementById("outHistoryCleanup");
+        const days = Number(val("retentionDays") || "30");
+        out.textContent = "删除中…";
+        try {
+          const json = await api("/api/admin/timeslots/history-delete", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ retention_days: days, confirm: true }),
+          });
+          out.textContent = JSON.stringify(json, null, 2);
+        } catch (e) {
+          out.textContent = "失败：" + (e.message || e);
         }
       });
 

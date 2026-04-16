@@ -186,6 +186,8 @@ CREATE TABLE credit_logs (
 | POST | `/api/admin/themes/:id/apply-pool-index` | Body：`{ pool_index }`（整数）。将 `POOL[pool_index]` 写入该主题的种子字段，并清空 `llm_generated_at` / `room_tasks_json`；**仅**当该行 `is_active=1` 且非沙箱 |
 | GET | `/api/admin/stats` | 注册总数、今日新增、近7日新增；主题总数、轮换池数量、上架主题数等 |
 | GET | `/api/admin/current-overview` | 当前上架 3 主题的“当前场次”概览：场次列表 + 预约用户（含 level）+ pairs（含双方 level） |
+| GET | `/api/admin/timeslots/history-preview` | Query：`retention_days`（1～365，默认30）。返回将删除的历史场次数量与 bookings/pairs 数量，以及 sample ids（不执行删除）。 |
+| POST | `/api/admin/timeslots/history-delete` | Body：`{ retention_days, confirm:true }`。硬删除已结束且早于保留期的历史场次，并级联删除关联 bookings/pairs。 |
 | POST | `/api/admin/themes/:id/generate-preview-by-direction` | Body：`{ direction }`（字符串）。仅**生成预览**（不写库），返回场景/角色/预习/任务等整包 JSON。 |
 | POST | `/api/admin/themes/:id/commit-generated-pack` | Body：`{ direction, pack }`。将上一步预览的 `pack` 通过服务端校验后**写入 themes**（封面仍保留当前行 `cover_url`）。 |
 | POST | `/api/admin/themes/llm-refresh-active` | 无 Body。与 `POST /api/dev/theme-llm-refresh-active` 同逻辑，**须 `ADMIN_EMAILS`**，**生产可用**；并发第二次返回 **409**（`REFRESH_IN_PROGRESS`） |

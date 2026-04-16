@@ -103,6 +103,98 @@ router.get("/timeslots", requireAdmin, async (req, res) => {
   }
 });
 
+function parseRetentionDays(raw, fallback) {
+  const n = Number(raw);
+  if (!Number.isFinite(n) || Number.isNaN(n)) return fallback;
+  const i = Math.floor(n);
+  if (i < 1) return 1;
+  if (i > 365) return 365;
+  return i;
+}
+
+async function getHistoryCleanupTargets(pool, retentionDays) {
+  const { rows } = await pool.query(
+    `SELECT t.id AS timeslot_id,
+            (SELECT COUNT(*)::int FROM bookings b WHERE b.timeslot_id = t.id) AS bookings_count,
+            (SELECT COUNT(*)::int FROM pairs p WHERE p.timeslot_id = t.id) AS pairs_count
+     FROM timeslots t
+     JOIN themes th ON th.id = t.theme_id
+     WHERE COALESCE(th.is_sandbox, FALSE) = FALSE
+       AND t.end_time < (NOW() - ($1::int * INTERVAL '1 day'))
+     ORDER BY t.end_time ASC
+     LIMIT 2000`,
+    [retentionDays]
+  );
+  const timeslotIds = rows.map((r) => Number(r.timeslot_id)).filter((x) => Number.isInteger(x));
+  const bookingsCount = rows.reduce((s, r) => s + (Number(r.bookings_count) || 0), 0);
+  const pairsCount = rows.reduce((s, r) => s + (Number(r.pairs_count) || 0), 0);
+  return { timeslotIds, bookingsCount, pairsCount };
+}
+
+// GET /api/admin/timeslots/history-preview?retention_days=30
+router.get("/timeslots/history-preview", requireAdmin, async (req, res) => {
+  const retentionDays = parseRetentionDays(req.query?.retention_days, 30);
+  try {
+    const pool = getPool();
+    const t = await getHistoryCleanupTargets(pool, retentionDays);
+    res.json({
+      code: 0,
+      message: "ok",
+      data: {
+        retentionDays,
+        timeslotsToDelete: t.timeslotIds.length,
+        bookingsToDelete: t.bookingsCount,
+        pairsToDelete: t.pairsCount,
+        sampleTimeslotIds: t.timeslotIds.slice(0, 20),
+      },
+    });
+  } catch (e) {
+    console.error("[admin] GET timeslots/history-preview", e);
+    res.status(500).json({ code: 500, message: "服务器错误", data: null });
+  }
+});
+
+// POST /api/admin/timeslots/history-delete  Body: { retention_days: number, confirm: true }
+router.post("/timeslots/history-delete", requireAdmin, async (req, res) => {
+  const retentionDays = parseRetentionDays(req.body?.retention_days, 30);
+  const confirm = req.body?.confirm === true;
+  if (!confirm) {
+    return res.status(400).json({ code: 400, message: "需 confirm=true 才会执行删除", data: null });
+  }
+  const pool = getPool();
+  const client = await pool.connect();
+  try {
+    await client.query("BEGIN");
+    const t = await getHistoryCleanupTargets(client, retentionDays);
+    if (!t.timeslotIds.length) {
+      await client.query("ROLLBACK");
+      return res.json({ code: 0, message: "ok", data: { retentionDays, deletedTimeslots: 0, deletedBookings: 0, deletedPairs: 0 } });
+    }
+
+    const delPairs = await client.query(`DELETE FROM pairs WHERE timeslot_id = ANY($1::int[])`, [t.timeslotIds]);
+    const delBookings = await client.query(`DELETE FROM bookings WHERE timeslot_id = ANY($1::int[])`, [t.timeslotIds]);
+    const delSlots = await client.query(`DELETE FROM timeslots WHERE id = ANY($1::int[])`, [t.timeslotIds]);
+
+    await client.query("COMMIT");
+    res.json({
+      code: 0,
+      message: "ok",
+      data: {
+        retentionDays,
+        deletedTimeslots: delSlots.rowCount || 0,
+        deletedBookings: delBookings.rowCount || 0,
+        deletedPairs: delPairs.rowCount || 0,
+      },
+    });
+  } catch (e) {
+    try { await client.query("ROLLBACK"); } catch (_) {}
+    console.error("[admin] POST timeslots/history-delete", e);
+    res.status(500).json({ code: 500, message: "服务器错误", data: null });
+  } finally {
+    client.release();
+  }
+});
+
 // GET /api/admin/current-overview  （当前上架3主题的“当前场次”概览：场次 + 预约 + 配对）
 router.get("/current-overview", requireAdmin, async (_req, res) => {
   try {
