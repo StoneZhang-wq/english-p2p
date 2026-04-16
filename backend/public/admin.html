@@ -23,6 +23,17 @@
       .admin-kpi .k { background: rgba(255,255,255,0.92); border: 1px solid rgba(15, 23, 42, 0.10); border-radius: 14px; padding: 10px 12px; }
       .admin-kpi .k .t { font-size: 12px; color: rgba(15, 23, 42, 0.62); }
       .admin-kpi .k .v { font-family: var(--font-serif); font-size: 20px; font-weight: 800; color: rgba(15, 23, 42, 0.92); margin-top: 4px; }
+      .manual-theme-fieldset { border: 1px solid rgba(15, 23, 42, 0.12); border-radius: 14px; padding: 12px 14px 14px; margin-top: 12px; background: rgba(255, 255, 255, 0.55); }
+      .manual-theme-fieldset > legend { padding: 0 8px; font-size: 13px; font-weight: 700; color: rgba(15, 23, 42, 0.82); }
+      .manual-grid-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; align-items: start; }
+      @media (max-width: 920px) { .manual-grid-2 { grid-template-columns: 1fr; } }
+      .manual-task-row { display: grid; gap: 8px; margin-bottom: 14px; padding-bottom: 14px; border-bottom: 1px dashed rgba(15, 23, 42, 0.1); }
+      .manual-task-row:last-child { border-bottom: none; margin-bottom: 0; padding-bottom: 0; }
+      .manual-task-row .task-num { font-size: 12px; font-weight: 700; color: rgba(26, 92, 255, 0.9); }
+      .admin-row textarea { min-height: 72px; padding: 10px 12px; border-radius: 12px; border: 1px solid rgba(15, 23, 42, 0.12); font-family: inherit; font-size: 13px; width: 100%; box-sizing: border-box; }
+      .admin-row textarea#mt_preview { min-height: 200px; }
+      .manual-ol { margin: 8px 0 0 18px; padding: 0; color: rgba(15, 23, 42, 0.72); font-size: 13px; line-height: 1.55; }
+      .manual-ol li { margin-bottom: 6px; }
     </style>
   </head>
   <body class="page-room">
@@ -181,6 +192,129 @@
 
         <section class="room-tasks-panel">
           <div class="room-tasks-head">
+            <h3 class="room-tasks-heading">3.1) 手动编辑周主题（不调用 LLM）</h3>
+          </div>
+          <div class="hint">
+            当 LLM 配额或输出不稳定时，可在此<strong>按表单填写</strong>整包内容并写入数据库。规则与 AI 生成一致（<code>theme_pack_v4</code>）：
+            两角色、每人<strong>恰好 6 条</strong>任务、每条 <strong>3～4 句</strong>英文提示；预习须含三个一级标题。
+          </div>
+          <ol class="manual-ol">
+            <li>选择<strong>周槽位</strong>（0/1/2 对应界面上「槽位 1/2/3」），点<strong>从服务器载入该槽当前主题</strong>把已有内容填进表单（可再改）。</li>
+            <li>两个角色的<strong>中文名</strong>会作为 <code>room_tasks_by_role</code> 的<strong>对象键</strong>，必须与下方「角色一 / 角色二」任务区使用的名字<strong>完全一致</strong>。</li>
+            <li>每条任务的英文提示框：<strong>一行一句</strong>，共 <strong>3～4 行</strong>（对应数组 <code>hints</code>）。</li>
+            <li>先点<strong>仅校验（不写库）</strong>，全部通过后再点<strong>写入数据库</strong>。写入接口与 AI「确认写入」相同，会更新 <code>llm_prompt_version</code>。</li>
+          </ol>
+
+          <div class="admin-row" style="margin-top: 12px">
+            <label>
+              周槽位 theme_slot
+              <select id="mt_slot">
+                <option value="0">0（槽位 1）</option>
+                <option value="1">1（槽位 2）</option>
+                <option value="2">2（槽位 3）</option>
+              </select>
+            </label>
+            <label>
+              绑定主题 id
+              <input id="mt_theme_id" placeholder="先点载入；或手填上架主题数字 id" inputmode="numeric" style="min-width: 140px" />
+            </label>
+            <button type="button" id="btnManualLoad">从服务器载入该槽当前主题</button>
+            <button type="button" id="btnManualPreviewTpl">插入预习三标题模板</button>
+            <button type="button" id="btnManualValidate">仅校验（不写库）</button>
+            <button type="button" id="btnManualCommit">写入数据库</button>
+          </div>
+
+          <div class="admin-row">
+            <label style="min-width: 280px">
+              主题名称 name（≤120 字）
+              <input id="mt_name" maxlength="120" placeholder="例如：超市购物" />
+            </label>
+            <label>
+              难度 difficulty
+              <select id="mt_difficulty">
+                <option value="beginner">beginner 初级</option>
+                <option value="intermediate" selected>intermediate 中级</option>
+                <option value="advanced">advanced 高级</option>
+              </select>
+            </label>
+          </div>
+          <div class="admin-row">
+            <label style="flex: 1; min-width: 280px">
+              一句话简介 description（必填，≤2000 字）
+              <textarea id="mt_description" rows="2" maxlength="2000" placeholder="例如：练习顾客与收银员在超市购物时的完整对话。"></textarea>
+            </label>
+          </div>
+          <div class="admin-row">
+            <label style="flex: 1; min-width: 280px">
+              场景一句 scene_text（≤220 字，不要写小说）
+              <textarea id="mt_scene" rows="2" maxlength="220" placeholder="例如：顾客在超市购物，收银员结账并回答商品位置。"></textarea>
+            </label>
+          </div>
+          <div class="admin-row">
+            <label style="flex: 1; min-width: 280px">
+              封面 cover_url（须 https；若库中已有封面，写入时通常会保留库里的图）
+              <input id="mt_cover" type="url" placeholder="https://..." />
+            </label>
+          </div>
+
+          <div class="manual-grid-2">
+            <fieldset class="manual-theme-fieldset">
+              <legend>角色一（ROLE 1）</legend>
+              <div class="admin-row">
+                <label>
+                  显示标签 label
+                  <input id="mt_r0_label" maxlength="32" placeholder="ROLE 1" />
+                </label>
+              </div>
+              <div class="admin-row">
+                <label>
+                  中文名 name（键名）
+                  <input id="mt_r0_name" maxlength="80" placeholder="例如：顾客" />
+                </label>
+              </div>
+              <div class="admin-row">
+                <label style="flex: 1">
+                  职责 desc（≤25 字）
+                  <input id="mt_r0_desc" maxlength="25" placeholder="问价、决定、问路、付款" />
+                </label>
+              </div>
+            </fieldset>
+            <fieldset class="manual-theme-fieldset">
+              <legend>角色二（ROLE 2）</legend>
+              <div class="admin-row">
+                <label>
+                  显示标签 label
+                  <input id="mt_r1_label" maxlength="32" placeholder="ROLE 2" />
+                </label>
+              </div>
+              <div class="admin-row">
+                <label>
+                  中文名 name（键名）
+                  <input id="mt_r1_name" maxlength="80" placeholder="例如：收银员" />
+                </label>
+              </div>
+              <div class="admin-row">
+                <label style="flex: 1">
+                  职责 desc（≤25 字）
+                  <input id="mt_r1_desc" maxlength="25" placeholder="报价、推荐、指路、收银" />
+                </label>
+              </div>
+            </fieldset>
+          </div>
+
+          <div id="mt_tasksMount"></div>
+
+          <fieldset class="manual-theme-fieldset">
+            <legend>预习 Markdown（须含 # 开口句 / # 你的6个任务（概览） / # 延长对话小贴士）</legend>
+            <div class="hint">总长度约 80～2000 字。可把下方模板中的「角色甲/乙」改成你的两个角色中文名。</div>
+            <textarea id="mt_preview" rows="12" maxlength="2000" placeholder="点击「插入预习三标题模板」开始"></textarea>
+          </fieldset>
+
+          <pre id="outManualTheme">（手动主题：校验或写入结果将显示在这里）</pre>
+        </section>
+
+        <section class="room-tasks-panel">
+          <div class="room-tasks-head">
             <h3 class="room-tasks-heading">3.5) 清理 AI 生成记录（删除）</h3>
           </div>
           <div class="hint">
@@ -233,8 +367,17 @@
         const res = await fetch(path, Object.assign({ credentials: "include" }, options || {}));
         const txt = await res.text();
         let json;
-        try { json = JSON.parse(txt); } catch { json = { raw: txt }; }
-        if (!res.ok) throw new Error((json && json.message) ? json.message : ("HTTP " + res.status));
+        try {
+          json = JSON.parse(txt);
+        } catch {
+          json = { raw: txt };
+        }
+        if (!res.ok) {
+          const msg = json && json.message ? json.message : "HTTP " + res.status;
+          const err = new Error(msg);
+          if (json && json.data && Array.isArray(json.data.errors)) err.validationErrors = json.data.errors;
+          throw err;
+        }
         return json;
       }
 
@@ -242,6 +385,245 @@
         const el = document.getElementById(id);
         return el ? String(el.value || "").trim() : "";
       }
+
+      var MANUAL_THEME_DIRECTION = "管理员手动编辑";
+
+      function mountManualThemeTasks() {
+        const mount = document.getElementById("mt_tasksMount");
+        if (!mount || mount.dataset.mounted === "1") return;
+        mount.dataset.mounted = "1";
+        mount.innerHTML = "";
+        for (let ri = 0; ri < 2; ri++) {
+          const fs = document.createElement("fieldset");
+          fs.className = "manual-theme-fieldset";
+          const leg = document.createElement("legend");
+          leg.textContent = ri === 0 ? "角色一：6 条任务" : "角色二：6 条任务";
+          fs.appendChild(leg);
+          const hint = document.createElement("div");
+          hint.className = "hint";
+          hint.style.marginBottom = "10px";
+          hint.textContent =
+            ri === 0
+              ? "下方任务的「归属」由上方「角色一中文名」决定；写入 JSON 时对象键必须与该中文名逐字一致。"
+              : "同上，对应「角色二中文名」。";
+          fs.appendChild(hint);
+          for (let ti = 0; ti < 6; ti++) {
+            const row = document.createElement("div");
+            row.className = "manual-task-row";
+            const num = document.createElement("div");
+            num.className = "task-num";
+            num.textContent = "第 " + String(ti + 1) + " 条任务";
+            row.appendChild(num);
+            const lab1 = document.createElement("label");
+            lab1.style.display = "grid";
+            lab1.style.gap = "6px";
+            const s1 = document.createElement("span");
+            s1.style.fontSize = "12px";
+            s1.style.color = "rgba(15,23,42,0.62)";
+            s1.textContent = "中文标题 title（≤200 字）";
+            const inp = document.createElement("input");
+            inp.id = "mt_tw_" + ri + "_" + ti + "_title";
+            inp.setAttribute("maxlength", "200");
+            lab1.appendChild(s1);
+            lab1.appendChild(inp);
+            row.appendChild(lab1);
+            const lab2 = document.createElement("label");
+            lab2.style.display = "grid";
+            lab2.style.gap = "6px";
+            const s2 = document.createElement("span");
+            s2.style.fontSize = "12px";
+            s2.style.color = "rgba(15,23,42,0.62)";
+            s2.innerHTML = "英文提示 hints：<strong>一行一句</strong>，共 <strong>3～4</strong> 行";
+            const ta = document.createElement("textarea");
+            ta.id = "mt_tw_" + ri + "_" + ti + "_hints";
+            ta.rows = 4;
+            ta.placeholder = "How much is this?\nAny discount today?\nI'll take it.";
+            lab2.appendChild(s2);
+            lab2.appendChild(ta);
+            row.appendChild(lab2);
+            fs.appendChild(row);
+          }
+          mount.appendChild(fs);
+        }
+      }
+
+      function manualThemeBuildPack() {
+        const r0 = val("mt_r0_name");
+        const r1 = val("mt_r1_name");
+        const roles = [
+          {
+            label: (val("mt_r0_label") || "ROLE 1").slice(0, 32),
+            name: r0,
+            desc: val("mt_r0_desc").slice(0, 25),
+          },
+          {
+            label: (val("mt_r1_label") || "ROLE 2").slice(0, 32),
+            name: r1,
+            desc: val("mt_r1_desc").slice(0, 25),
+          },
+        ];
+        const room_tasks_by_role = {};
+        for (let ri = 0; ri < 2; ri++) {
+          const key = ri === 0 ? r0 : r1;
+          room_tasks_by_role[key] = [];
+          for (let ti = 0; ti < 6; ti++) {
+            const titleEl = document.getElementById("mt_tw_" + ri + "_" + ti + "_title");
+            const hintsEl = document.getElementById("mt_tw_" + ri + "_" + ti + "_hints");
+            const title = titleEl ? String(titleEl.value || "").trim() : "";
+            const hintsRaw = hintsEl ? String(hintsEl.value || "") : "";
+            const hints = hintsRaw
+              .split(/\r?\n/)
+              .map(function (s) {
+                return s.trim();
+              })
+              .filter(Boolean)
+              .slice(0, 4);
+            room_tasks_by_role[key].push({ id: "m" + String(ri + 1) + "_" + String(ti + 1), title: title, hints: hints });
+          }
+        }
+        return {
+          name: val("mt_name"),
+          description: val("mt_description"),
+          scene_text: val("mt_scene"),
+          roles: roles,
+          preview_markdown: val("mt_preview"),
+          cover_url: val("mt_cover"),
+          difficulty_level: val("mt_difficulty") || "intermediate",
+          room_tasks_by_role: room_tasks_by_role,
+        };
+      }
+
+      function manualThemeFillFromServerTheme(t) {
+        const hid = document.getElementById("mt_theme_id");
+        if (hid) hid.value = t.id ? String(t.id) : "";
+        const setv = function (id, v) {
+          const el = document.getElementById(id);
+          if (el) el.value = v == null ? "" : String(v);
+        };
+        setv("mt_name", t.name || "");
+        setv("mt_description", t.description || "");
+        setv("mt_scene", t.sceneText || "");
+        setv("mt_cover", t.coverUrl || "");
+        const diff = String(t.difficultyLevel || "intermediate").toLowerCase();
+        const ds = document.getElementById("mt_difficulty");
+        if (ds) ds.value = ["beginner", "intermediate", "advanced"].includes(diff) ? diff : "intermediate";
+        const ra = Array.isArray(t.roles) ? t.roles : [];
+        setv("mt_r0_label", (ra[0] && ra[0].label) || "ROLE 1");
+        setv("mt_r0_name", (ra[0] && ra[0].name) || "");
+        setv("mt_r0_desc", (ra[0] && ra[0].desc) || "");
+        setv("mt_r1_label", (ra[1] && ra[1].label) || "ROLE 2");
+        setv("mt_r1_name", (ra[1] && ra[1].name) || "");
+        setv("mt_r1_desc", (ra[1] && ra[1].desc) || "");
+        setv("mt_preview", t.previewMarkdown || "");
+        const rt = t.roomTasks;
+        const byRole = rt && typeof rt === "object" && !Array.isArray(rt) && rt.byRole ? rt.byRole : null;
+        const r0n = ra[0] && ra[0].name ? String(ra[0].name).trim() : "";
+        const r1n = ra[1] && ra[1].name ? String(ra[1].name).trim() : "";
+        for (let ri = 0; ri < 2; ri++) {
+          const key = ri === 0 ? r0n : r1n;
+          const arr = byRole && key ? byRole[key] : null;
+          const list = Array.isArray(arr) ? arr : [];
+          for (let ti = 0; ti < 6; ti++) {
+            const titleEl = document.getElementById("mt_tw_" + ri + "_" + ti + "_title");
+            const hintsEl = document.getElementById("mt_tw_" + ri + "_" + ti + "_hints");
+            if (!titleEl || !hintsEl) continue;
+            const task = list[ti] || {};
+            titleEl.value = task.title || "";
+            const hs = Array.isArray(task.hints) ? task.hints : [];
+            hintsEl.value = hs.join("\n");
+          }
+        }
+      }
+
+      mountManualThemeTasks();
+
+      document.getElementById("btnManualLoad").addEventListener("click", async function () {
+        const out = document.getElementById("outManualTheme");
+        out.textContent = "载入中…";
+        try {
+          const json = await api("/api/admin/themes/active-full");
+          const slot = Number(val("mt_slot"));
+          const list = json && json.data && Array.isArray(json.data.themes) ? json.data.themes : [];
+          const t = list.find(function (x) {
+            return Number(x.themeSlot) === slot;
+          });
+          if (!t || !t.id) {
+            out.textContent =
+              "失败：未找到 theme_slot=" + String(slot) + " 的上架主题。请先完成周主题上架或检查槽位。";
+            return;
+          }
+          manualThemeFillFromServerTheme(t);
+          out.textContent =
+            "已载入主题 id=" + String(t.id) + "（" + (t.name || "") + "）。编辑后可「仅校验」再「写入数据库」。";
+        } catch (e) {
+          var m = "失败：" + (e.message || e);
+          if (e.validationErrors && e.validationErrors.length) m += "\n- " + e.validationErrors.join("\n- ");
+          out.textContent = m;
+        }
+      });
+
+      document.getElementById("btnManualPreviewTpl").addEventListener("click", function () {
+        const tpl =
+          "# 开口句\n" +
+          "- 角色甲：Hi, I'd like to get this, please.\n" +
+          "- 角色乙：Sure! That's $3.50. Would you like a bag?\n\n" +
+          "# 你的6个任务（概览）\n" +
+          "**角色甲**：1. 打招呼并说明要买什么 2. 询问价格或优惠 3. 追问规格或位置 4. 表达偏好并决定 5. 付款相关 6. 道别\n" +
+          "**角色乙**：1. 问候与报价 2. 主动推荐或说明活动 3. 回答位置或库存 4. 确认购买内容 5. 收款与找零 6. 道别\n\n" +
+          "# 延长对话小贴士\n" +
+          "- 多问一句：What do you recommend?\n" +
+          "- 说明偏好：I prefer something cheaper / cold.\n" +
+          "- 复述确认：So the milk is on aisle 2, right?";
+        const el = document.getElementById("mt_preview");
+        if (el) el.value = tpl;
+      });
+
+      document.getElementById("btnManualValidate").addEventListener("click", async function () {
+        const out = document.getElementById("outManualTheme");
+        const pack = manualThemeBuildPack();
+        out.textContent = "校验中…";
+        try {
+          const json = await api("/api/admin/themes/validate-pack", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ pack: pack }),
+          });
+          const d = json && json.data ? json.data : {};
+          if (d.ok) out.textContent = "校验通过（未写库）。可点击「写入数据库」。";
+          else out.textContent = "校验未通过：\n- " + (Array.isArray(d.errors) ? d.errors.join("\n- ") : "未知错误");
+        } catch (e) {
+          var m = "失败：" + (e.message || e);
+          if (e.validationErrors && e.validationErrors.length) m += "\n- " + e.validationErrors.join("\n- ");
+          out.textContent = m;
+        }
+      });
+
+      document.getElementById("btnManualCommit").addEventListener("click", async function () {
+        const out = document.getElementById("outManualTheme");
+        const tid = parseInt(val("mt_theme_id"), 10);
+        if (!Number.isFinite(tid) || tid <= 0) {
+          out.textContent =
+            "失败：请填写有效的「绑定主题 id」（可先点「从服务器载入」自动填入，或手填当前周上架主题的 id）。";
+          return;
+        }
+        const pack = manualThemeBuildPack();
+        out.textContent = "写入中…";
+        try {
+          const json = await api(
+            "/api/admin/themes/" + encodeURIComponent(String(tid)) + "/commit-generated-pack",
+            {
+              method: "POST",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({ direction: MANUAL_THEME_DIRECTION, pack: pack, generation_id: null }),
+            }
+          );
+          out.textContent = JSON.stringify(json, null, 2);
+        } catch (e) {
+          var m = "失败：" + (e.message || e);
+          if (e.validationErrors && e.validationErrors.length) m += "\n- " + e.validationErrors.join("\n- ");
+          out.textContent = m;
+        }
+      });
 
       function esc(s) {
         return String(s == null ? "" : s)

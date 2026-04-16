@@ -6,6 +6,7 @@ const {
   generateThemePack,
   fetchRecentThemeDedupContext,
   validatePack,
+  validatePackDetailed,
   applySeedCoverUrl,
   PROMPT_VERSION,
 } = require("../services/themeLlmEnrichment");
@@ -680,6 +681,28 @@ router.post("/themes/llm-refresh-active", requireAdmin, async (_req, res) => {
   }
 });
 
+// POST /api/admin/themes/validate-pack  Body: { pack: object }  — 仅校验，不写库；返回可读错误列表
+router.post("/themes/validate-pack", requireAdmin, async (req, res) => {
+  const packRaw = req.body?.pack;
+  if (!packRaw || typeof packRaw !== "object") {
+    return res.status(400).json({ code: 400, message: "pack 无效", data: null });
+  }
+  try {
+    const detail = validatePackDetailed(packRaw);
+    return res.json({
+      code: 0,
+      message: "ok",
+      data: {
+        ok: detail.ok,
+        errors: detail.errors,
+      },
+    });
+  } catch (e) {
+    console.error("[admin] POST themes/validate-pack", e);
+    return res.status(500).json({ code: 500, message: e && e.message ? e.message : "服务器错误", data: null });
+  }
+});
+
 // POST /api/admin/themes/:id/generate-preview-by-direction  Body: { direction: string }
 router.post("/themes/:id/generate-preview-by-direction", requireAdmin, async (req, res) => {
   const themeId = Number(req.params.id);
@@ -815,7 +838,12 @@ router.post("/themes/:id/commit-generated-pack", requireAdmin, async (req, res) 
     // 将管理员预览的内容（packRaw）做一次服务端校验，再写库；封面以当前行 cover_url 为准。
     const validated = validatePack(packRaw);
     if (!validated) {
-      return res.status(400).json({ code: 400, message: "pack 未通过校验（字段缺失或长度不合规）", data: null });
+      const det = validatePackDetailed(packRaw);
+      return res.status(400).json({
+        code: 400,
+        message: "pack 未通过校验，请根据下列项修改后重试",
+        data: { errors: det.errors && det.errors.length ? det.errors : ["未知校验失败，请对照主题字段规范检查"] },
+      });
     }
     applySeedCoverUrl(validated, { cover_url: row.cover_url });
 

@@ -101,70 +101,196 @@ function normalizeRoomTasksByRoleToSix(byRole, roleNames) {
   return out;
 }
 
-function validatePack(obj) {
-  if (!obj || typeof obj !== "object") return null;
+/**
+ * 校验主题整包；失败时收集**全部**可读原因（供管理员手动录入页展示）。
+ * @returns {{ errors: string[], pack: object | null }}
+ */
+function tryValidatePack(obj) {
+  /** @type {string[]} */
+  var errors = [];
+  if (!obj || typeof obj !== "object") {
+    errors.push("根数据必须是 JSON 对象");
+    return { errors: errors, pack: null };
+  }
+
   var name = String(obj.name || "").trim();
-  if (!name || name.length > 120) return null;
+  if (!name) errors.push("「主题名称」不能为空");
+  else if (name.length > 120) errors.push("「主题名称」不能超过 120 字");
+
   var description = String(obj.description || "").trim();
-  if (!description || description.length > 2000) return null;
+  if (!description) errors.push("「一句话简介 description」不能为空");
+  else if (description.length > 2000) errors.push("「简介」不能超过 2000 字");
+
   var scene_text = String(obj.scene_text || "").trim();
-  if (!scene_text || scene_text.length > SCENE_TEXT_MAX_LEN) return null;
-  var roles = obj.roles;
-  if (!roles && obj.roles_json != null) {
+  if (!scene_text) errors.push("「场景 scene_text」不能为空（一句话：谁在做什么）");
+  else if (scene_text.length > SCENE_TEXT_MAX_LEN) {
+    errors.push("「场景」不能超过 " + String(SCENE_TEXT_MAX_LEN) + " 字，请缩短为一句");
+  }
+
+  var rolesArr = obj.roles;
+  if (!rolesArr && obj.roles_json != null) {
     try {
-      roles = typeof obj.roles_json === "string" ? JSON.parse(obj.roles_json) : obj.roles_json;
-    } catch {
-      roles = null;
+      rolesArr = typeof obj.roles_json === "string" ? JSON.parse(obj.roles_json) : obj.roles_json;
+    } catch (e) {
+      errors.push("「roles_json」不是合法 JSON：" + (e && e.message ? String(e.message) : String(e)));
+      rolesArr = null;
     }
   }
-  if (!Array.isArray(roles) || roles.length < 2) return null;
-  roles = roles.slice(0, 2).map(function (r) {
-    return {
-      label: String(r.label || "ROLE").slice(0, 32),
-      name: String(r.name || "").slice(0, 80),
-      desc: String(r.desc || "").trim().slice(0, ROLE_DESC_MAX_LEN),
-    };
-  });
-  if (roles.length !== 2 || !roles[0].name || !roles[1].name) return null;
-  if (!roles[0].desc || !roles[1].desc) return null;
+  if (!Array.isArray(rolesArr) || rolesArr.length < 2) {
+    errors.push("「角色 roles」须为数组且至少 2 条（产品固定为两人对话）");
+  }
+  var roles = Array.isArray(rolesArr)
+    ? rolesArr.slice(0, 2).map(function (r) {
+        return {
+          label: String((r && r.label) || "ROLE").slice(0, 32),
+          name: String((r && r.name) || "").slice(0, 80),
+          desc: String((r && r.desc) || "").trim().slice(0, ROLE_DESC_MAX_LEN),
+        };
+      })
+    : [];
+  if (roles.length !== 2) {
+    errors.push("解析后需要**两个**完整角色条目（每项含中文名与职责），当前不足两条");
+  } else {
+    if (!roles[0].name || !roles[1].name) errors.push("两个角色都必须填写「中文名 name」（用于房间内任务分组键）");
+    if (!roles[0].desc) errors.push("角色一「职责 desc」不能为空（建议不超过 " + String(ROLE_DESC_MAX_LEN) + " 字）");
+    if (!roles[1].desc) errors.push("角色二「职责 desc」不能为空（建议不超过 " + String(ROLE_DESC_MAX_LEN) + " 字）");
+  }
+
   var preview_markdown = String(obj.preview_markdown || "").trim();
-  if (
-    !preview_markdown ||
-    preview_markdown.length < PREVIEW_MARKDOWN_MIN_LEN ||
-    preview_markdown.length > PREVIEW_MARKDOWN_MAX_LEN
-  )
-    return null;
-  if (!/#\s*开口句/.test(preview_markdown)) return null;
-  if (!/#\s*你的6个任务（概览）/.test(preview_markdown)) return null;
-  if (!/#\s*延长对话小贴士/.test(preview_markdown)) return null;
+  if (!preview_markdown) errors.push("「预习 preview_markdown」不能为空");
+  else {
+    if (preview_markdown.length < PREVIEW_MARKDOWN_MIN_LEN) {
+      errors.push(
+        "「预习」过短（至少 " + String(PREVIEW_MARKDOWN_MIN_LEN) + " 字），请写满「开口句 + 6 任务概览 + 延长技巧」"
+      );
+    }
+    if (preview_markdown.length > PREVIEW_MARKDOWN_MAX_LEN) {
+      errors.push("「预习」不能超过 " + String(PREVIEW_MARKDOWN_MAX_LEN) + " 字");
+    }
+    if (!/#\s*开口句/.test(preview_markdown)) errors.push("预习中必须包含一级标题：`# 开口句`（# 与文字之间可有空格）");
+    if (!/#\s*你的6个任务（概览）/.test(preview_markdown)) {
+      errors.push("预习中必须包含一级标题：`# 你的6个任务（概览）`");
+    }
+    if (!/#\s*延长对话小贴士/.test(preview_markdown)) errors.push("预习中必须包含一级标题：`# 延长对话小贴士`");
+  }
+
   var cover_url = String(obj.cover_url || "").trim();
-  if (!cover_url || !/^https?:\/\//i.test(cover_url)) return null;
+  if (!cover_url) errors.push("「封面 cover_url」不能为空（须为 http(s) 图片链接；写入时通常会以库中预置封面为准）");
+  else if (!/^https?:\/\//i.test(cover_url)) errors.push("「封面 cover_url」须以 http:// 或 https:// 开头");
 
-  var roleNames = [roles[0].name, roles[1].name].map(function (x) {
-    return String(x || "").trim();
-  });
+  var roleNames =
+    roles.length === 2
+      ? [String(roles[0].name || "").trim(), String(roles[1].name || "").trim()]
+      : ["", ""];
 
-  var roomTasksPayload = null;
-  // v3：按角色拆分任务集（本版本强制使用，支撑“每人 6 步、每步多轮”）
-  if (obj.room_tasks_by_role == null) return null;
+  if (roleNames[0] && roleNames[1] && roleNames[0] === roleNames[1]) {
+    errors.push("两个角色的中文名不能完全相同，否则无法区分任务分组");
+  }
+
+  var byRoleRaw = obj.room_tasks_by_role;
+  if (byRoleRaw == null) {
+    errors.push("缺少「room_tasks_by_role」：以角色中文名为键、每人 6 条任务为值的对象");
+  } else if (typeof byRoleRaw !== "object" || Array.isArray(byRoleRaw)) {
+    errors.push("「room_tasks_by_role」必须是对象（不能是数组）");
+  } else if (roleNames[0] && roleNames[1]) {
+    for (var ri = 0; ri < 2; ri++) {
+      var rn = roleNames[ri];
+      if (!Object.prototype.hasOwnProperty.call(byRoleRaw, rn)) {
+        errors.push(
+          "「room_tasks_by_role」缺少键「" +
+            rn +
+            "」：键名必须与上方「角色" +
+            String(ri + 1) +
+            "中文名」**逐字一致**（含空格）"
+        );
+      }
+    }
+    for (var ti = 0; ti < 2; ti++) {
+      var rname = roleNames[ti];
+      if (!rname || !Object.prototype.hasOwnProperty.call(byRoleRaw, rname)) continue;
+      var arr = byRoleRaw[rname];
+      if (!Array.isArray(arr)) {
+        errors.push("角色「" + rname + "」的任务值必须是长度为 6 的数组");
+        continue;
+      }
+      if (arr.length !== ROOM_TASKS_TARGET) {
+        errors.push("角色「" + rname + "」须恰好 " + String(ROOM_TASKS_TARGET) + " 条任务，当前为 " + String(arr.length) + " 条");
+      }
+      var limit = Math.min(arr.length, ROOM_TASKS_TARGET);
+      for (var k = 0; k < limit; k++) {
+        var task = arr[k];
+        var title = task && String(task.title || "").trim();
+        var hints = Array.isArray(task && task.hints)
+          ? task.hints
+              .map(function (h) {
+                return String(h).trim();
+              })
+              .filter(Boolean)
+              .slice(0, HINTS_MAX)
+          : [];
+        if (!title) errors.push("角色「" + rname + "」第 " + String(k + 1) + " 条任务缺少「中文标题 title」");
+        if (hints.length < HINTS_MIN) {
+          errors.push(
+            "角色「" +
+              rname +
+              "」第 " +
+              String(k + 1) +
+              " 条：英文提示「hints」至少 " +
+              String(HINTS_MIN) +
+              " 句，当前有效句数为 " +
+              String(hints.length)
+          );
+        }
+      }
+    }
+  }
+
+  if (errors.length) return { errors: errors, pack: null };
+
   var by = normalizeRoomTasksByRoleToSix(obj.room_tasks_by_role, roleNames);
-  if (!by) return null;
-  roomTasksPayload = { version: 3, byRole: by };
+  if (!by) {
+    errors.push(
+      "「room_tasks_by_role」结构未通过归一化校验：请确认每位角色 6 条、每条含标题且 hints 为 " +
+        String(HINTS_MIN) +
+        "～" +
+        String(HINTS_MAX) +
+        " 条英文短句"
+    );
+    return { errors: errors, pack: null };
+  }
 
+  var roomTasksPayload = { version: 3, byRole: by };
   var difficulty_level = ["beginner", "intermediate", "advanced"].includes(String(obj.difficulty_level))
     ? String(obj.difficulty_level)
     : "intermediate";
 
   return {
-    name: name,
-    description: description,
-    scene_text: scene_text,
-    roles_json: JSON.stringify(roles),
-    preview_markdown: preview_markdown,
-    cover_url: cover_url,
-    difficulty_level: difficulty_level,
-    room_tasks_payload: roomTasksPayload,
+    errors: [],
+    pack: {
+      name: name,
+      description: description,
+      scene_text: scene_text,
+      roles_json: JSON.stringify(roles),
+      preview_markdown: preview_markdown,
+      cover_url: cover_url,
+      difficulty_level: difficulty_level,
+      room_tasks_payload: roomTasksPayload,
+    },
   };
+}
+
+function validatePack(obj) {
+  var r = tryValidatePack(obj);
+  return r.pack;
+}
+
+/**
+ * @param {unknown} obj
+ * @returns {{ ok: boolean, errors: string[], normalizedPack: object | null }}
+ */
+function validatePackDetailed(obj) {
+  var r = tryValidatePack(obj);
+  return { ok: r.errors.length === 0, errors: r.errors, normalizedPack: r.pack };
 }
 
 /**
@@ -608,6 +734,7 @@ module.exports = {
   refreshActiveThemesWithLlm,
   generateThemePack,
   validatePack,
+  validatePackDetailed,
   applySeedCoverUrl,
   fetchRecentThemeDedupContext,
   PROMPT_VERSION,

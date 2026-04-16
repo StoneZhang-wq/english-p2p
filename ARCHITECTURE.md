@@ -189,8 +189,9 @@ CREATE TABLE credit_logs (
 | GET | `/api/admin/generations/:id` | 单条 AI 生成记录详情（含 `pack_json`） |
 | GET | `/api/admin/generations/history-preview` | Query：`retention_days`（1～365，默认30）。预览将删除多少条生成记录（不执行删除）。 |
 | POST | `/api/admin/generations/history-delete` | Body：`{ retention_days, confirm:true }`。硬删除早于保留期的生成记录（不影响已写入主题）。 |
+| POST | `/api/admin/themes/validate-pack` | Body：`{ pack }`。仅校验主题整包（与写入同一套 `validatePack` 规则），返回 `data.ok` 与 `data.errors`（可读中文列表），**不写库**。供 `admin.html`「手动编辑」区在提交前自检。 |
 | POST | `/api/admin/themes/:id/generate-preview-by-direction` | Body：`{ direction }`（字符串）。生成整包预览，并写入 `theme_generations` 留痕（status=`preview`），返回 `generationId` + 场景/角色/预习/任务等 JSON。 |
-| POST | `/api/admin/themes/:id/commit-generated-pack` | Body：`{ direction, pack, generation_id? }`。将预览 `pack` 通过服务端校验后**写入 themes**（默认保留当前行 `cover_url`）；若带 `generation_id`，会将对应生成记录标记为 `applied`。 |
+| POST | `/api/admin/themes/:id/commit-generated-pack` | Body：`{ direction, pack, generation_id? }`。将预览或**管理员手填** `pack` 通过服务端校验后**写入 themes**（默认保留当前行 `cover_url`）；若带 `generation_id`，会将对应生成记录标记为 `applied`。校验失败时响应 `data.errors` 列表。 |
 | POST | `/api/admin/themes/llm-refresh-active` | 无 Body。与 `POST /api/dev/theme-llm-refresh-active` 同逻辑，**须 `ADMIN_EMAILS`**，**生产可用**；并发第二次返回 **409**（`REFRESH_IN_PROGRESS`） |
 
 **开发调试（非正式配对）**：当 `NODE_ENV !== 'production'` **或** `ENABLE_DEV_PAIRING=1` 时挂载 `routes/devPairing.js`（否则不注册该路径）：
