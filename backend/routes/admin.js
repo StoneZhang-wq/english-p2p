@@ -60,6 +60,7 @@ router.get("/stats", requireAdmin, async (_req, res) => {
 // GET /api/admin/timeslots?theme_id=123
 router.get("/timeslots", requireAdmin, async (req, res) => {
   const themeId = req.query?.theme_id != null ? Number(req.query.theme_id) : null;
+  const recent = String(req.query?.recent || "").trim() === "1";
   if (themeId != null && (!themeId || Number.isNaN(themeId))) {
     return res.status(400).json({ code: 400, message: "theme_id 无效", data: null });
   }
@@ -79,9 +80,10 @@ router.get("/timeslots", requireAdmin, async (req, res) => {
        FROM timeslots t
        JOIN themes th ON th.id = t.theme_id
        WHERE ($1::int IS NULL OR t.theme_id = $1::int)
+         AND ($2::boolean = FALSE OR (t.start_time >= (NOW() - INTERVAL '6 hours') AND t.start_time <= (NOW() + INTERVAL '7 days')))
        ORDER BY t.start_time ASC
        LIMIT 200`,
-      [themeId]
+      [themeId, recent]
     );
     res.json({ code: 0, message: "ok", data: { timeslots: rows.map((r) => ({
       id: r.id,
