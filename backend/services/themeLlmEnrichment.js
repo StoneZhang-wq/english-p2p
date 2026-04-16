@@ -577,6 +577,8 @@ module.exports = {
   rerunThemeLlmForDev,
   refreshActiveThemesWithLlm,
   generateThemePack,
+  validatePack,
+  applySeedCoverUrl,
   fetchRecentThemeDedupContext,
   PROMPT_VERSION,
 };

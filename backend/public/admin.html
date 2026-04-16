@@ -27,6 +27,18 @@
       <div class="admin-grid">
         <section class="room-tasks-panel">
           <div class="room-tasks-head">
+            <h3 class="room-tasks-heading">0) 总览指标</h3>
+          </div>
+          <div class="admin-row">
+            <button id="btnLoadStats">刷新统计</button>
+            <button id="btnLoadCurrentOverview">拉取当前场次总览（上架3主题）</button>
+          </div>
+          <pre id="outStats">（等待操作）</pre>
+          <pre id="outCurrentOverview">（等待操作）</pre>
+        </section>
+
+        <section class="room-tasks-panel">
+          <div class="room-tasks-head">
             <h3 class="room-tasks-heading">1) 查看场次列表</h3>
           </div>
           <div class="admin-row">
@@ -64,10 +76,14 @@
           </div>
           <div class="admin-row">
             <button id="btnLoadThemePool">拉取轮换池列表</button>
+            <button id="btnLoadThemePoolFull">拉取轮换池完整内容</button>
             <button id="btnLoadActiveThemes">拉取当前活跃主题</button>
+            <button id="btnLoadActiveThemesFull">拉取当前活跃主题完整内容</button>
           </div>
           <pre id="outThemePool">（轮换池未加载）</pre>
+          <pre id="outThemePoolFull">（轮换池完整内容未加载）</pre>
           <pre id="outActiveThemes">（活跃主题未加载）</pre>
+          <pre id="outActiveThemesFull">（活跃主题完整内容未加载）</pre>
           <div class="admin-row" style="margin-top: 10px">
             <label>
               主题 id
@@ -85,26 +101,32 @@
               槽位 1 方向（theme_slot=0）
               <input id="dir0" placeholder="例如：深层工作相关（面试/汇报/会议/跨部门沟通）" />
             </label>
-            <button id="btnGen0">生成槽位1</button>
+            <button id="btnPreview0">预览生成槽位1</button>
+            <button id="btnCommit0" disabled>确认写入槽位1</button>
           </div>
           <div class="admin-row">
             <label>
               槽位 2 方向（theme_slot=1）
               <input id="dir1" placeholder="例如：租房看房（押金/维修/入住）" />
             </label>
-            <button id="btnGen1">生成槽位2</button>
+            <button id="btnPreview1">预览生成槽位2</button>
+            <button id="btnCommit1" disabled>确认写入槽位2</button>
           </div>
           <div class="admin-row">
             <label>
               槽位 3 方向（theme_slot=2）
               <input id="dir2" placeholder="例如：客户投诉与协商（补偿/升级/致歉）" />
             </label>
-            <button id="btnGen2">生成槽位3</button>
+            <button id="btnPreview2">预览生成槽位3</button>
+            <button id="btnCommit2" disabled>确认写入槽位3</button>
           </div>
           <div class="admin-row" style="margin-top: 10px">
             <button id="btnLlmRefreshActive">整批 LLM刷新（当前至多 3 主题）</button>
           </div>
           <pre id="outThemeOps">（主题操作结果）</pre>
+          <pre id="outThemePreview0">（槽位1预览未生成）</pre>
+          <pre id="outThemePreview1">（槽位2预览未生成）</pre>
+          <pre id="outThemePreview2">（槽位3预览未生成）</pre>
         </section>
 
         <section class="room-tasks-panel">
@@ -164,11 +186,55 @@
         }
       });
 
+      document.getElementById("btnLoadStats").addEventListener("click", async function () {
+        const out = document.getElementById("outStats");
+        out.textContent = "加载中…";
+        try {
+          const json = await api("/api/admin/stats");
+          out.textContent = JSON.stringify(json, null, 2);
+        } catch (e) {
+          out.textContent = "失败：" + (e.message || e);
+        }
+      });
+
+      document.getElementById("btnLoadCurrentOverview").addEventListener("click", async function () {
+        const out = document.getElementById("outCurrentOverview");
+        out.textContent = "加载中…";
+        try {
+          const json = await api("/api/admin/current-overview");
+          out.textContent = JSON.stringify(json, null, 2);
+        } catch (e) {
+          out.textContent = "失败：" + (e.message || e);
+        }
+      });
+
       document.getElementById("btnLoadActiveThemes").addEventListener("click", async function () {
         const out = document.getElementById("outActiveThemes");
         out.textContent = "加载中…";
         try {
           const json = await api("/api/admin/themes/active");
+          out.textContent = JSON.stringify(json, null, 2);
+        } catch (e) {
+          out.textContent = "失败：" + (e.message || e);
+        }
+      });
+
+      document.getElementById("btnLoadThemePoolFull").addEventListener("click", async function () {
+        const out = document.getElementById("outThemePoolFull");
+        out.textContent = "加载中…";
+        try {
+          const json = await api("/api/admin/themes/pool-full");
+          out.textContent = JSON.stringify(json, null, 2);
+        } catch (e) {
+          out.textContent = "失败：" + (e.message || e);
+        }
+      });
+
+      document.getElementById("btnLoadActiveThemesFull").addEventListener("click", async function () {
+        const out = document.getElementById("outActiveThemesFull");
+        out.textContent = "加载中…";
+        try {
+          const json = await api("/api/admin/themes/active-full");
           out.textContent = JSON.stringify(json, null, 2);
         } catch (e) {
           out.textContent = "失败：" + (e.message || e);
@@ -217,7 +283,11 @@
         }
       }
 
-      async function generateSlot(slot, direction) {
+      function slotPreviewStateKey(slot) {
+        return "__adminThemePreviewSlot" + String(slot);
+      }
+
+      async function previewSlot(slot, direction) {
         const out = document.getElementById("outThemeOps");
         const themes = parseActiveThemesJson();
         const t = themes.find((x) => Number(x.themeSlot) === Number(slot));
@@ -231,30 +301,70 @@
         }
         out.textContent = "提交中…（生成可能需数分钟，请勿重复点击）";
         try {
-          const json = await api("/api/admin/themes/" + encodeURIComponent(String(t.id)) + "/generate-by-direction", {
+          const json = await api("/api/admin/themes/" + encodeURIComponent(String(t.id)) + "/generate-preview-by-direction", {
             method: "POST",
             headers: { "Content-Type": "application/json" },
             body: JSON.stringify({ direction }),
           });
           out.textContent = JSON.stringify(json, null, 2);
-          // 生成后自动刷新活跃主题预览
-          try {
-            const latest = await api("/api/admin/themes/active");
-            document.getElementById("outActiveThemes").textContent = JSON.stringify(latest, null, 2);
-          } catch {}
+          // 保存预览到 window 状态，供确认写入使用
+          window[slotPreviewStateKey(slot)] = { themeId: t.id, direction, preview: json && json.data ? json.data.preview : null };
+          const previewOut = document.getElementById("outThemePreview" + String(slot));
+          if (previewOut) previewOut.textContent = JSON.stringify(window[slotPreviewStateKey(slot)], null, 2);
+          const commitBtn = document.getElementById("btnCommit" + String(slot));
+          if (commitBtn) commitBtn.disabled = !(window[slotPreviewStateKey(slot)] && window[slotPreviewStateKey(slot)].preview);
         } catch (e) {
           out.textContent = "失败：" + (e.message || e);
         }
       }
 
-      document.getElementById("btnGen0").addEventListener("click", function () {
-        generateSlot(0, val("dir0"));
+      async function commitSlot(slot) {
+        const out = document.getElementById("outThemeOps");
+        const st = window[slotPreviewStateKey(slot)];
+        if (!st || !st.themeId || !st.preview) {
+          out.textContent = "失败：请先预览生成槽位" + String(slot + 1);
+          return;
+        }
+        out.textContent = "写入中…";
+        try {
+          const json = await api("/api/admin/themes/" + encodeURIComponent(String(st.themeId)) + "/commit-generated-pack", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ direction: st.direction, pack: st.preview }),
+          });
+          out.textContent = JSON.stringify(json, null, 2);
+          // 写入后刷新活跃主题（含完整内容）
+          try {
+            const latest = await api("/api/admin/themes/active");
+            document.getElementById("outActiveThemes").textContent = JSON.stringify(latest, null, 2);
+            const latestFull = await api("/api/admin/themes/active-full");
+            document.getElementById("outActiveThemesFull").textContent = JSON.stringify(latestFull, null, 2);
+          } catch {}
+          const commitBtn = document.getElementById("btnCommit" + String(slot));
+          if (commitBtn) commitBtn.disabled = true;
+        } catch (e) {
+          out.textContent = "失败：" + (e.message || e);
+        }
+      }
+
+      document.getElementById("btnPreview0").addEventListener("click", function () {
+        previewSlot(0, val("dir0"));
       });
-      document.getElementById("btnGen1").addEventListener("click", function () {
-        generateSlot(1, val("dir1"));
+      document.getElementById("btnPreview1").addEventListener("click", function () {
+        previewSlot(1, val("dir1"));
       });
-      document.getElementById("btnGen2").addEventListener("click", function () {
-        generateSlot(2, val("dir2"));
+      document.getElementById("btnPreview2").addEventListener("click", function () {
+        previewSlot(2, val("dir2"));
+      });
+
+      document.getElementById("btnCommit0").addEventListener("click", function () {
+        commitSlot(0);
+      });
+      document.getElementById("btnCommit1").addEventListener("click", function () {
+        commitSlot(1);
+      });
+      document.getElementById("btnCommit2").addEventListener("click", function () {
+        commitSlot(2);
       });
 
       document.getElementById("btnLoadSlots").addEventListener("click", async function () {

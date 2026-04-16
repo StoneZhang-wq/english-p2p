@@ -180,9 +180,14 @@ CREATE TABLE credit_logs (
 | POST | `/api/admin/timeslots/:id/pair` | Body：`{ user_a, user_b, force? }`；两人须均已预约该场次；`force=true` 时会先清掉该场次中涉及任一人的旧 pairs；随后插入一条新 pairs（频道名 `admin_eng_...`） |
 | POST | `/api/admin/timeslots/:id/unpair` | Body：`{ pair_id }`；删除该场次指定 pairs |
 | GET | `/api/admin/themes/active` | 当前 `is_active` 的正式周主题**至多 3 条**（含 id、槽位、周、LLM 版本摘要） |
+| GET | `/api/admin/themes/active-full` | 当前上架 3 个正式主题的**完整内容**（场景、角色、预习、room_tasks_json 等） |
 | GET | `/api/admin/themes/pool` | `themeRotationPool.js` 轮换池**索引列表**（供套用种子） |
+| GET | `/api/admin/themes/pool-full` | 轮换池 `POOL` 的**完整内容**（含场景/角色/预习/封面等） |
 | POST | `/api/admin/themes/:id/apply-pool-index` | Body：`{ pool_index }`（整数）。将 `POOL[pool_index]` 写入该主题的种子字段，并清空 `llm_generated_at` / `room_tasks_json`；**仅**当该行 `is_active=1` 且非沙箱 |
-| POST | `/api/admin/themes/:id/generate-by-direction` | Body：`{ direction }`（字符串）。管理员为该主题指定“方向/关键词”（如“深层工作相关”），服务端以 v3 提示词生成整包内容并写回；生成后可在 `admin.html` 预览写入结果。 |
+| GET | `/api/admin/stats` | 注册总数、今日新增、近7日新增；主题总数、轮换池数量、上架主题数等 |
+| GET | `/api/admin/current-overview` | 当前上架 3 主题的“当前场次”概览：场次列表 + 预约用户（含 level）+ pairs（含双方 level） |
+| POST | `/api/admin/themes/:id/generate-preview-by-direction` | Body：`{ direction }`（字符串）。仅**生成预览**（不写库），返回场景/角色/预习/任务等整包 JSON。 |
+| POST | `/api/admin/themes/:id/commit-generated-pack` | Body：`{ direction, pack }`。将上一步预览的 `pack` 通过服务端校验后**写入 themes**（封面仍保留当前行 `cover_url`）。 |
 | POST | `/api/admin/themes/llm-refresh-active` | 无 Body。与 `POST /api/dev/theme-llm-refresh-active` 同逻辑，**须 `ADMIN_EMAILS`**，**生产可用**；并发第二次返回 **409**（`REFRESH_IN_PROGRESS`） |
 
 **开发调试（非正式配对）**：当 `NODE_ENV !== 'production'` **或** `ENABLE_DEV_PAIRING=1` 时挂载 `routes/devPairing.js`（否则不注册该路径）：

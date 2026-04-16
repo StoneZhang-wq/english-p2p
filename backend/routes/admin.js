@@ -2,13 +2,60 @@ const express = require("express");
 const { getPool } = require("../db");
 const { requireAdmin } = require("../middleware/requireAdmin");
 const { POOL } = require("../data/themeRotationPool");
-const { refreshActiveThemesWithLlm, generateThemePack, fetchRecentThemeDedupContext, PROMPT_VERSION } = require("../services/themeLlmEnrichment");
+const {
+  refreshActiveThemesWithLlm,
+  generateThemePack,
+  fetchRecentThemeDedupContext,
+  validatePack,
+  applySeedCoverUrl,
+  PROMPT_VERSION,
+} = require("../services/themeLlmEnrichment");
 
 const router = express.Router();
 
 function makeChannelName(timeslotId, userA, userB) {
   return `admin_eng_${timeslotId}_${userA}_${userB}_${Date.now()}`;
 }
+
+function safeJsonParse(raw, fallback) {
+  if (raw == null) return fallback;
+  try {
+    const obj = typeof raw === "string" ? JSON.parse(raw) : raw;
+    return obj == null ? fallback : obj;
+  } catch {
+    return fallback;
+  }
+}
+
+// GET /api/admin/stats
+router.get("/stats", requireAdmin, async (_req, res) => {
+  try {
+    const pool = getPool();
+    const [{ rows: uCnt }, { rows: uToday }, { rows: u7 }, { rows: thCnt }, { rows: thActive }] =
+      await Promise.all([
+        pool.query(`SELECT COUNT(*)::int AS c FROM users`),
+        pool.query(`SELECT COUNT(*)::int AS c FROM users WHERE created_at >= date_trunc('day', NOW())`),
+        pool.query(`SELECT COUNT(*)::int AS c FROM users WHERE created_at >= NOW() - INTERVAL '7 days'`),
+        pool.query(`SELECT COUNT(*)::int AS c FROM themes`),
+        pool.query(`SELECT COUNT(*)::int AS c FROM themes WHERE is_active = 1 AND COALESCE(is_sandbox, FALSE) = FALSE`),
+      ]);
+    res.json({
+      code: 0,
+      message: "ok",
+      data: {
+        usersTotal: uCnt[0]?.c || 0,
+        usersNewToday: uToday[0]?.c || 0,
+        usersNewLast7Days: u7[0]?.c || 0,
+        themesTotal: thCnt[0]?.c || 0,
+        themesPoolTotal: POOL.length,
+        themesActiveTotal: thActive[0]?.c || 0,
+      },
+    });
+  } catch (e) {
+    console.error("[admin] GET stats", e);
+    res.status(500).json({ code: 500, message: "服务器错误", data: null });
+  }
+});
 
 // GET /api/admin/timeslots?theme_id=123
 router.get("/timeslots", requireAdmin, async (req, res) => {
@@ -50,6 +97,100 @@ router.get("/timeslots", requireAdmin, async (req, res) => {
     })) } });
   } catch (e) {
     console.error("[admin] GET timeslots", e);
+    res.status(500).json({ code: 500, message: "服务器错误", data: null });
+  }
+});
+
+// GET /api/admin/current-overview  （当前上架3主题的“当前场次”概览：场次 + 预约 + 配对）
+router.get("/current-overview", requireAdmin, async (_req, res) => {
+  try {
+    const pool = getPool();
+    const { rows: act } = await pool.query(
+      `SELECT id, theme_slot, shanghai_week_monday::text AS week_monday, name
+       FROM themes
+       WHERE is_active = 1 AND COALESCE(is_sandbox, FALSE) = FALSE AND shanghai_week_monday IS NOT NULL
+       ORDER BY shanghai_week_monday DESC, theme_slot ASC
+       LIMIT 3`
+    );
+    const themeIds = act.map((x) => Number(x.id)).filter((n) => Number.isInteger(n));
+    if (!themeIds.length) {
+      return res.json({ code: 0, message: "ok", data: { themes: [], timeslots: [] } });
+    }
+
+    // 当前场次：取“最近6小时到未来7天”的场次
+    const { rows: slots } = await pool.query(
+      `SELECT t.id, t.theme_id,
+              to_char(t.start_time, 'YYYY-MM-DD HH24:MI:SS') AS start_time,
+              to_char(t.end_time, 'YYYY-MM-DD HH24:MI:SS') AS end_time,
+              t.status AS slot_status,
+              th.name AS theme_name
+       FROM timeslots t
+       JOIN themes th ON th.id = t.theme_id
+       WHERE t.theme_id = ANY($1::int[])
+         AND t.start_time >= (NOW() - INTERVAL '6 hours')
+         AND t.start_time <= (NOW() + INTERVAL '7 days')
+       ORDER BY t.start_time ASC
+       LIMIT 60`,
+      [themeIds]
+    );
+    const slotIds = slots.map((s) => Number(s.id)).filter((n) => Number.isInteger(n));
+
+    const { rows: bookings } = slotIds.length
+      ? await pool.query(
+          `SELECT b.timeslot_id, b.user_id, b.level, to_char(b.created_at, 'YYYY-MM-DD HH24:MI:SS') AS created_at,
+                  u.email, u.nickname
+           FROM bookings b
+           JOIN users u ON u.id = b.user_id
+           WHERE b.timeslot_id = ANY($1::int[]) AND b.status = 'confirmed'
+           ORDER BY b.timeslot_id ASC, b.created_at ASC`,
+          [slotIds]
+        )
+      : { rows: [] };
+
+    const { rows: pairs } = slotIds.length
+      ? await pool.query(
+          `SELECT p.id, p.timeslot_id, p.user_a, p.user_b, p.channel_name, p.status, to_char(p.created_at, 'YYYY-MM-DD HH24:MI:SS') AS created_at,
+                  ua.email AS user_a_email, ua.nickname AS user_a_nickname,
+                  ub.email AS user_b_email, ub.nickname AS user_b_nickname,
+                  ba.level AS user_a_level, bb.level AS user_b_level
+           FROM pairs p
+           LEFT JOIN users ua ON ua.id = p.user_a
+           LEFT JOIN users ub ON ub.id = p.user_b
+           LEFT JOIN bookings ba ON ba.timeslot_id = p.timeslot_id AND ba.user_id = p.user_a AND ba.status='confirmed'
+           LEFT JOIN bookings bb ON bb.timeslot_id = p.timeslot_id AND bb.user_id = p.user_b AND bb.status='confirmed'
+           WHERE p.timeslot_id = ANY($1::int[])
+           ORDER BY p.timeslot_id ASC, p.created_at ASC`,
+          [slotIds]
+        )
+      : { rows: [] };
+
+    res.json({
+      code: 0,
+      message: "ok",
+      data: {
+        themes: act.map((t) => ({ id: t.id, themeSlot: t.theme_slot, weekMonday: t.week_monday, name: t.name })),
+        timeslots: slots.map((s) => ({ id: s.id, themeId: s.theme_id, themeName: s.theme_name, startTime: s.start_time, endTime: s.end_time, slotStatus: s.slot_status })),
+        bookings: bookings.map((b) => ({
+          timeslotId: b.timeslot_id,
+          userId: b.user_id,
+          level: b.level,
+          createdAt: b.created_at,
+          email: b.email,
+          nickname: b.nickname,
+        })),
+        pairs: pairs.map((p) => ({
+          id: p.id,
+          timeslotId: p.timeslot_id,
+          channelName: p.channel_name,
+          status: p.status,
+          createdAt: p.created_at,
+          userA: { id: p.user_a, email: p.user_a_email, nickname: p.user_a_nickname, level: p.user_a_level ?? null },
+          userB: { id: p.user_b, email: p.user_b_email, nickname: p.user_b_nickname, level: p.user_b_level ?? null },
+        })),
+      },
+    });
+  } catch (e) {
+    console.error("[admin] GET current-overview", e);
     res.status(500).json({ code: 500, message: "服务器错误", data: null });
   }
 });
@@ -168,8 +309,26 @@ router.post("/timeslots/:id/pair", requireAdmin, async (req, res) => {
       [timeslotId, userA, userB, channelName]
     );
 
+    // 返回双方 level 便于管理员确认
+    const { rows: lv } = await client.query(
+      `SELECT user_id, level FROM bookings WHERE timeslot_id = $1 AND status='confirmed' AND user_id = ANY($2::int[])`,
+      [timeslotId, [userA, userB]]
+    );
+    const levels = Object.fromEntries(lv.map((r) => [String(r.user_id), r.level]));
+
     await client.query("COMMIT");
-    res.json({ code: 0, message: "ok", data: { pairId: ins.rows[0].id, timeslotId, channelName, userA, userB } });
+    res.json({
+      code: 0,
+      message: "ok",
+      data: {
+        pairId: ins.rows[0].id,
+        timeslotId,
+        channelName,
+        userA: { id: userA, level: levels[String(userA)] ?? null },
+        userB: { id: userB, level: levels[String(userB)] ?? null },
+        force,
+      },
+    });
   } catch (e) {
     try { await client.query("ROLLBACK"); } catch (_) {}
     console.error("[admin] POST pair", e);
@@ -237,6 +396,65 @@ router.get("/themes/pool", requireAdmin, async (_req, res) => {
   }
 });
 
+// GET /api/admin/themes/pool-full  （轮换池完整内容）
+router.get("/themes/pool-full", requireAdmin, async (_req, res) => {
+  try {
+    const full = POOL.map((p, i) => ({
+      index: i,
+      name: p.name,
+      description: p.description,
+      difficultyLevel: p.difficulty_level,
+      sceneText: p.scene_text,
+      roles: safeJsonParse(p.roles_json, []),
+      coverUrl: p.cover_url,
+      previewMarkdown: p.preview_markdown,
+    }));
+    res.json({ code: 0, message: "ok", data: { pool: full, count: POOL.length } });
+  } catch (e) {
+    console.error("[admin] GET themes/pool-full", e);
+    res.status(500).json({ code: 500, message: "服务器错误", data: null });
+  }
+});
+
+// GET /api/admin/themes/active-full  （当前上架3主题完整内容）
+router.get("/themes/active-full", requireAdmin, async (_req, res) => {
+  try {
+    const pool = getPool();
+    const { rows } = await pool.query(
+      `SELECT id, name, description, slug, theme_slot, scene_text, roles_json, cover_url, difficulty_level,
+              shanghai_week_monday::text AS week_monday, preview_markdown,
+              room_tasks_json, llm_generated_at::text AS llm_generated_at, llm_prompt_version
+       FROM themes
+       WHERE is_active = 1 AND COALESCE(is_sandbox, FALSE) = FALSE AND shanghai_week_monday IS NOT NULL
+       ORDER BY shanghai_week_monday DESC, theme_slot ASC
+       LIMIT 3`
+    );
+    const themes = rows.map((r) => {
+      const roomTasks = safeJsonParse(r.room_tasks_json, null);
+      return {
+        id: r.id,
+        name: r.name,
+        description: r.description,
+        slug: r.slug,
+        themeSlot: Number(r.theme_slot),
+        weekMonday: r.week_monday,
+        sceneText: r.scene_text || "",
+        roles: safeJsonParse(r.roles_json, []),
+        coverUrl: r.cover_url,
+        difficultyLevel: r.difficulty_level,
+        previewMarkdown: r.preview_markdown || "",
+        roomTasks,
+        llmGeneratedAt: r.llm_generated_at || null,
+        llmPromptVersion: r.llm_prompt_version || null,
+      };
+    });
+    res.json({ code: 0, message: "ok", data: { themes } });
+  } catch (e) {
+    console.error("[admin] GET themes/active-full", e);
+    res.status(500).json({ code: 500, message: "服务器错误", data: null });
+  }
+});
+
 // POST /api/admin/themes/llm-refresh-active  （当前活跃至多 3 条主题整批 LLM，与 dev 接口同逻辑，无需 ENABLE_DEV_PAIRING）
 router.post("/themes/llm-refresh-active", requireAdmin, async (_req, res) => {
   try {
@@ -256,8 +474,8 @@ router.post("/themes/llm-refresh-active", requireAdmin, async (_req, res) => {
   }
 });
 
-// POST /api/admin/themes/:id/generate-by-direction  Body: { direction: string }
-router.post("/themes/:id/generate-by-direction", requireAdmin, async (req, res) => {
+// POST /api/admin/themes/:id/generate-preview-by-direction  Body: { direction: string }
+router.post("/themes/:id/generate-preview-by-direction", requireAdmin, async (req, res) => {
   const themeId = Number(req.params.id);
   const direction = String(req.body?.direction || "").trim();
   if (!themeId || Number.isNaN(themeId)) {
@@ -296,42 +514,13 @@ router.post("/themes/:id/generate-by-direction", requireAdmin, async (req, res) 
       { recentDedup, direction }
     );
 
-    const upd = await pool.query(
-      `UPDATE themes SET
-         name = $1,
-         description = $2,
-         scene_text = $3,
-         roles_json = $4,
-         preview_markdown = $5,
-         cover_url = $6,
-         difficulty_level = $7,
-         room_tasks_json = $8::jsonb,
-         llm_generated_at = NOW(),
-         llm_prompt_version = $9
-       WHERE id = $10`,
-      [
-        pack.name,
-        pack.description,
-        pack.scene_text,
-        pack.roles_json,
-        pack.preview_markdown,
-        pack.cover_url,
-        pack.difficulty_level,
-        JSON.stringify(pack.room_tasks_payload),
-        PROMPT_VERSION || "theme_pack_v3",
-        themeId,
-      ]
-    );
-    if (upd.rowCount !== 1) {
-      return res.status(500).json({ code: 500, message: "更新主题失败", data: null });
-    }
     res.json({
       code: 0,
       message: "ok",
       data: {
         themeId,
         direction,
-        theme: {
+        preview: {
           name: pack.name,
           description: pack.description,
           sceneText: pack.scene_text,
@@ -347,7 +536,88 @@ router.post("/themes/:id/generate-by-direction", requireAdmin, async (req, res) 
     if (code === "LLM_NOT_CONFIGURED") {
       return res.status(503).json({ code: 503, message: e.message, data: null });
     }
-    console.error("[admin] POST themes/generate-by-direction", e);
+    console.error("[admin] POST themes/generate-preview-by-direction", e);
+    const msg = e && e.message ? e.message : "服务器错误";
+    return res.status(500).json({ code: 500, message: msg, data: null });
+  }
+});
+
+// POST /api/admin/themes/:id/commit-generated-pack  Body: { direction: string, pack: object }
+router.post("/themes/:id/commit-generated-pack", requireAdmin, async (req, res) => {
+  const themeId = Number(req.params.id);
+  const direction = String(req.body?.direction || "").trim();
+  const packRaw = req.body?.pack;
+  if (!themeId || Number.isNaN(themeId)) {
+    return res.status(400).json({ code: 400, message: "theme id 无效", data: null });
+  }
+  if (!direction || direction.length > 200) {
+    return res.status(400).json({ code: 400, message: "direction 不能为空且长度≤200", data: null });
+  }
+  if (!packRaw || typeof packRaw !== "object") {
+    return res.status(400).json({ code: 400, message: "pack 无效", data: null });
+  }
+  try {
+    const pool = getPool();
+    const { rows } = await pool.query(
+      `SELECT id, cover_url, name, description, scene_text, roles_json, preview_markdown, difficulty_level, theme_slot,
+              shanghai_week_monday::text AS week_monday
+       FROM themes
+       WHERE id = $1 AND is_active = 1 AND COALESCE(is_sandbox, FALSE) = FALSE AND shanghai_week_monday IS NOT NULL
+       LIMIT 1`,
+      [themeId]
+    );
+    const row = rows[0];
+    if (!row) {
+      return res.status(404).json({ code: 404, message: "主题不存在或非当前上架正式主题", data: null });
+    }
+
+    // 将管理员预览的内容（packRaw）做一次服务端校验，再写库；封面以当前行 cover_url 为准。
+    const validated = validatePack(packRaw);
+    if (!validated) {
+      return res.status(400).json({ code: 400, message: "pack 未通过校验（字段缺失或长度不合规）", data: null });
+    }
+    applySeedCoverUrl(validated, { cover_url: row.cover_url });
+
+    const upd = await pool.query(
+      `UPDATE themes SET
+         name = $1,
+         description = $2,
+         scene_text = $3,
+         roles_json = $4,
+         preview_markdown = $5,
+         cover_url = $6,
+         difficulty_level = $7,
+         room_tasks_json = $8::jsonb,
+         llm_generated_at = NOW(),
+         llm_prompt_version = $9
+       WHERE id = $10`,
+      [
+        validated.name,
+        validated.description,
+        validated.scene_text,
+        validated.roles_json,
+        validated.preview_markdown,
+        validated.cover_url,
+        validated.difficulty_level,
+        JSON.stringify(validated.room_tasks_payload),
+        PROMPT_VERSION || "theme_pack_v3",
+        themeId,
+      ]
+    );
+    if (upd.rowCount !== 1) {
+      return res.status(500).json({ code: 500, message: "更新主题失败", data: null });
+    }
+    res.json({
+      code: 0,
+      message: "ok",
+      data: { themeId, direction, llmPromptVersion: PROMPT_VERSION },
+    });
+  } catch (e) {
+    const code = e && e.code;
+    if (code === "LLM_NOT_CONFIGURED") {
+      return res.status(503).json({ code: 503, message: e.message, data: null });
+    }
+    console.error("[admin] POST themes/commit-generated-pack", e);
     const msg = e && e.message ? e.message : "服务器错误";
     return res.status(500).json({ code: 500, message: msg, data: null });
   }
