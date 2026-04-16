@@ -71,7 +71,6 @@ async function migrateThemesSandboxFlag(p) {
 
 async function migrateThemesLlmColumns(p) {
   await p.query(`ALTER TABLE themes ADD COLUMN IF NOT EXISTS room_tasks_json JSONB`);
-  await p.query(`ALTER TABLE themes ADD COLUMN IF NOT EXISTS practice_kit_json JSONB`);
   await p.query(`ALTER TABLE themes ADD COLUMN IF NOT EXISTS llm_generated_at TIMESTAMPTZ`);
   await p.query(`ALTER TABLE themes ADD COLUMN IF NOT EXISTS llm_prompt_version TEXT`);
 }

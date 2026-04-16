@@ -627,7 +627,7 @@ router.get("/themes/active-full", requireAdmin, async (_req, res) => {
   try {
     const pool = getPool();
     const { rows } = await pool.query(
-      `SELECT id, name, description, slug, theme_slot, scene_text, practice_kit_json, roles_json, cover_url, difficulty_level,
+      `SELECT id, name, description, slug, theme_slot, scene_text, roles_json, cover_url, difficulty_level,
               shanghai_week_monday::text AS week_monday, preview_markdown,
               room_tasks_json, llm_generated_at::text AS llm_generated_at, llm_prompt_version
        FROM themes
@@ -637,7 +637,6 @@ router.get("/themes/active-full", requireAdmin, async (_req, res) => {
     );
     const themes = rows.map((r) => {
       const roomTasks = safeJsonParse(r.room_tasks_json, null);
-      const practiceKit = safeJsonParse(r.practice_kit_json, null);
       return {
         id: r.id,
         name: r.name,
@@ -646,7 +645,6 @@ router.get("/themes/active-full", requireAdmin, async (_req, res) => {
         themeSlot: Number(r.theme_slot),
         weekMonday: r.week_monday,
         sceneText: r.scene_text || "",
-        practiceKit,
         roles: safeJsonParse(r.roles_json, []),
         coverUrl: r.cover_url,
         difficultyLevel: r.difficulty_level,
@@ -727,7 +725,6 @@ router.post("/themes/:id/generate-preview-by-direction", requireAdmin, async (re
       description: pack.description,
       difficulty_level: pack.difficulty_level || row.difficulty_level || "intermediate",
       scene_text: pack.scene_text,
-      practice_kit: pack.practice_kit || null,
       roles_json: pack.roles_json,
       preview_markdown: pack.preview_markdown,
       cover_url: pack.cover_url,
@@ -747,28 +744,10 @@ router.post("/themes/:id/generate-preview-by-direction", requireAdmin, async (re
         themeId,
         direction,
         generationId: Number(ins.rows?.[0]?.id) || null,
-        // 供写入使用：保持服务端校验形态（snake_case + roles_json + room_tasks_payload + practice_kit）
-        pack: {
-          name: pack.name,
-          description: pack.description,
-          scene_text: pack.scene_text,
-          practice_kit: pack.practice_kit || null,
-          roles_json: pack.roles_json,
-          preview_markdown: pack.preview_markdown,
-          cover_url: pack.cover_url,
-          difficulty_level: pack.difficulty_level,
-          room_tasks_by_role:
-            pack.room_tasks_payload && typeof pack.room_tasks_payload === "object" && !Array.isArray(pack.room_tasks_payload)
-              ? pack.room_tasks_payload.byRole
-              : undefined,
-          room_tasks:
-            Array.isArray(pack.room_tasks_payload) ? pack.room_tasks_payload : undefined,
-        },
         preview: {
           name: pack.name,
           description: pack.description,
           sceneText: pack.scene_text,
-          practiceKit: pack.practice_kit || null,
           roles: JSON.parse(pack.roles_json),
           previewMarkdown: pack.preview_markdown,
           roomTasks: pack.room_tasks_payload,
@@ -836,10 +815,9 @@ router.post("/themes/:id/commit-generated-pack", requireAdmin, async (req, res) 
          cover_url = $6,
          difficulty_level = $7,
          room_tasks_json = $8::jsonb,
-         practice_kit_json = $9::jsonb,
          llm_generated_at = NOW(),
-         llm_prompt_version = $10
-       WHERE id = $11`,
+         llm_prompt_version = $9
+       WHERE id = $10`,
       [
         validated.name,
         validated.description,
@@ -849,7 +827,6 @@ router.post("/themes/:id/commit-generated-pack", requireAdmin, async (req, res) 
         validated.cover_url,
         validated.difficulty_level,
         JSON.stringify(validated.room_tasks_payload),
-        validated.practice_kit ? JSON.stringify(validated.practice_kit) : null,
         PROMPT_VERSION || "theme_pack_v3",
         themeId,
       ]

@@ -20,75 +20,6 @@ const ROOM_TASKS_MAX = 7;
 const ROOM_TASKS_TARGET = 6;
 const PREVIEW_MARKDOWN_MIN_LEN = 600;
 
-function normalizeString(s, maxLen) {
-  var v = String(s == null ? "" : s).trim();
-  if (!v) return "";
-  if (maxLen && v.length > maxLen) v = v.slice(0, maxLen);
-  return v;
-}
-
-function normalizeStringArray(arr, maxItems, itemMaxLen) {
-  if (!Array.isArray(arr)) return [];
-  var out = [];
-  for (var i = 0; i < arr.length; i++) {
-    var x = normalizeString(arr[i], itemMaxLen || 220);
-    if (!x) continue;
-    out.push(x);
-    if (maxItems && out.length >= maxItems) break;
-  }
-  return out;
-}
-
-function normalizePracticeKit(pk, roleNames) {
-  if (!pk || typeof pk !== "object") return null;
-  if (!Array.isArray(roleNames) || roleNames.length !== 2) return null;
-
-  var core = normalizeString(pk.core_conflict, 160);
-  if (!core) return null;
-
-  var info = pk.info_gap && typeof pk.info_gap === "object" ? pk.info_gap : null;
-  var roleA = normalizeString(info && info.role_A_knows, 260);
-  var roleB = normalizeString(info && info.role_B_knows, 260);
-  var shared = normalizeStringArray(info && info.shared_known, 6, 120);
-  if (!roleA || !roleB) return null;
-
-  var secret = pk.secret_goal_by_role && typeof pk.secret_goal_by_role === "object" ? pk.secret_goal_by_role : null;
-  var secrets = {};
-  secrets[roleNames[0]] = normalizeString(secret && (secret[roleNames[0]] || secret.roleA), 180);
-  secrets[roleNames[1]] = normalizeString(secret && (secret[roleNames[1]] || secret.roleB), 180);
-  if (!secrets[roleNames[0]] || !secrets[roleNames[1]]) return null;
-
-  var sp = pk.survival_phrases && typeof pk.survival_phrases === "object" ? pk.survival_phrases : null;
-  var survival = {
-    when_stuck: normalizeStringArray(sp && sp.when_stuck, 3, 120),
-    when_disagree: normalizeStringArray(sp && sp.when_disagree, 3, 120),
-    when_time_pressed: normalizeStringArray(sp && sp.when_time_pressed, 3, 120),
-  };
-  if (!survival.when_stuck.length || !survival.when_disagree.length || !survival.when_time_pressed.length) return null;
-
-  var warm = pk.two_minute_warmup;
-  var warmup = null;
-  if (warm && typeof warm === "object") {
-    warmup = {};
-    warmup[roleNames[0]] = normalizeString(warm[roleNames[0]] || warm.roleA, 200);
-    warmup[roleNames[1]] = normalizeString(warm[roleNames[1]] || warm.roleB, 200);
-  } else {
-    warmup = null;
-  }
-  if (!warmup || !warmup[roleNames[0]] || !warmup[roleNames[1]]) return null;
-
-  var twist = normalizeString(pk.twist, 220);
-
-  return {
-    core_conflict: core,
-    info_gap: { role_A_knows: roleA, role_B_knows: roleB, shared_known: shared },
-    secret_goal_by_role: secrets,
-    survival_phrases: survival,
-    two_minute_warmup: warmup,
-    twist: twist || null,
-  };
-}
-
 function safeParseRoles(rolesJson) {
   if (!rolesJson) return [];
   try {
@@ -197,12 +128,6 @@ function validatePack(obj) {
     return String(x || "").trim();
   });
 
-  var practiceKit = null;
-  if (obj.practice_kit != null) {
-    practiceKit = normalizePracticeKit(obj.practice_kit, roleNames);
-    if (!practiceKit) return null;
-  }
-
   var roomTasksPayload = null;
   // v3：按角色拆分任务集
   if (obj.room_tasks_by_role != null) {
@@ -224,7 +149,6 @@ function validatePack(obj) {
     name: name,
     description: description,
     scene_text: scene_text,
-    practice_kit: practiceKit,
     roles_json: JSON.stringify(roles),
     preview_markdown: preview_markdown,
     cover_url: cover_url,
@@ -320,14 +244,6 @@ async function generateThemePack(seed, options) {
     '  "name": string,\n' +
     '  "description": string,\n' +
     '  "scene_text": string,\n' +
-    '  "practice_kit": {\n' +
-    '    "core_conflict": string,\n' +
-    '    "info_gap": { "role_A_knows": string, "role_B_knows": string, "shared_known": string[] },\n' +
-    '    "secret_goal_by_role": Record<string, string>,\n' +
-    '    "survival_phrases": { "when_stuck": string[], "when_disagree": string[], "when_time_pressed": string[] },\n' +
-    '    "two_minute_warmup": Record<string, string>,\n' +
-    '    "twist"?: string\n' +
-    "  },\n" +
     '  "roles": { "label": string, "name": string, "desc": string }[],\n' +
     '  "preview_markdown": string,\n' +
     '  "cover_url": string,\n' +
@@ -335,16 +251,14 @@ async function generateThemePack(seed, options) {
     '  "room_tasks": { "id": string, "title": string, "hints": string[] }[]\n' +
     "}\n" +
     "要求：\n" +
-    "- **接地气**：scene_text 必须写成真实可发生的对话场景，少形容词、少宏大叙事，多具体限制与尴尬点（例如：时间不够、信息缺失、对方误解、规则冲突、要做决定）。长度建议 120～260 字；避免空洞文学化形容。\n" +
-    "- practice_kit 必须围绕「可聊下去」设计：必须包含 core_conflict（1句矛盾）、info_gap（双方信息差）、每角色 secret_goal、三类 survival_phrases（每类≤3句英文短句）、two_minute_warmup（按角色给出第一句话）。intermediate/advanced 必须提供 twist（突发转折）。\n" +
+    "- name/description/scene_text 以**中文**为主，适合中国大陆用户；scene_text 为一段沉浸式场景描写（可含氛围与双方关系），避免与【场景去重】列表雷同。\n" +
     "- roles **恰好 2 条**，与口语对练角色一致；每条 desc 为**总结性说明**（职责/目标/信息差），各不超过约 120 字。\n" +
-    "- preview_markdown 为 **Markdown**，更偏“练”而不是“课纲”，至少包含这些一级标题：\n" +
-    "  `# 2分钟开口` `# 关键信息差` `# 救命句` `# 容易踩坑` `# 6步推进`\n" +
-    "其中「救命句」每类不超过 3 句，必须可直接在对话中说出来；避免长篇大论。\n" +
+    "- preview_markdown 为 **Markdown**，须**丰满**，至少包含这些一级标题（可按 `#标题`）：\n" +
+    "  `# 学习目标` `# 核心词汇` `# 实用句型` `# 情景对话示例` `# 常见误区` `# 自练清单`\n" +
+    "其中「核心词汇」「实用句型」要足够具体；**英文例句**用英文；总长度建议明显长于短文。\n" +
     "- cover_url：必须是可公网访问的 **https** 图片 URL；若不确定可用 Unsplash 与场景相关的图片 URL（模型仍需输出合法 URL；落库时可能保留种子封面）。\n" +
     "- room_tasks：若不提供 room_tasks_by_role，则输出 **5～7** 条（推荐 6条）。每条 title 为**中文**练习任务；hints 为 **3～5** 条**英文**常用句，口语难度与 difficulty_level 一致；任务之间递进、避免重复问法。\n" +
     "- room_tasks_by_role（推荐使用）：按角色名拆分任务：{ \"角色名A\": Task[], \"角色名B\": Task[] }；每个数组输出 **5～7** 条，服务端会规范成 6 条落库。\n" +
-    "- 禁止教科书式“礼貌闲聊模板”。必须制造信息澄清、误解、冲突点或时间压力，让两个人不合作就完不成。\n" +
     "- 在种子基础上**改写增强**，不要逐字复制种子正文。";
 
   var directionBlock = direction
@@ -429,10 +343,9 @@ async function tryEnrichThemesWithLlm(pool) {
            cover_url = $6,
            difficulty_level = $7,
            room_tasks_json = $8::jsonb,
-           practice_kit_json = $9::jsonb,
            llm_generated_at = NOW(),
-           llm_prompt_version = $10
-         WHERE id = $11 AND llm_generated_at IS NULL`,
+           llm_prompt_version = $9
+         WHERE id = $10 AND llm_generated_at IS NULL`,
         [
           pack.name,
           pack.description,
@@ -442,7 +355,6 @@ async function tryEnrichThemesWithLlm(pool) {
           pack.cover_url,
           pack.difficulty_level,
           JSON.stringify(pack.room_tasks_payload),
-          pack.practice_kit ? JSON.stringify(pack.practice_kit) : null,
           PROMPT_VERSION,
           row.id,
         ]
@@ -537,10 +449,9 @@ async function refreshActiveThemesWithLlmBody(pool) {
            cover_url = $6,
            difficulty_level = $7,
            room_tasks_json = $8::jsonb,
-           practice_kit_json = $9::jsonb,
            llm_generated_at = NOW(),
-           llm_prompt_version = $10
-         WHERE id = $11`,
+           llm_prompt_version = $9
+         WHERE id = $10`,
         [
           pack.name,
           pack.description,
@@ -550,7 +461,6 @@ async function refreshActiveThemesWithLlmBody(pool) {
           pack.cover_url,
           pack.difficulty_level,
           JSON.stringify(pack.room_tasks_payload),
-          pack.practice_kit ? JSON.stringify(pack.practice_kit) : null,
           PROMPT_VERSION,
           row.id,
         ]
@@ -637,10 +547,9 @@ async function rerunThemeLlmForDev(pool, themeId) {
        cover_url = $6,
        difficulty_level = $7,
        room_tasks_json = $8::jsonb,
-       practice_kit_json = $9::jsonb,
        llm_generated_at = NOW(),
-       llm_prompt_version = $10
-     WHERE id = $11`,
+       llm_prompt_version = $9
+     WHERE id = $10`,
     [
       pack.name,
       pack.description,
@@ -650,7 +559,6 @@ async function rerunThemeLlmForDev(pool, themeId) {
       pack.cover_url,
       pack.difficulty_level,
       JSON.stringify(pack.room_tasks_payload),
-      pack.practice_kit ? JSON.stringify(pack.practice_kit) : null,
       PROMPT_VERSION,
       tid,
     ]

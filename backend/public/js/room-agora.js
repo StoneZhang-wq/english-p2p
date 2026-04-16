@@ -232,39 +232,6 @@
     if (titleEl && theme.name) titleEl.textContent = String(theme.name);
     var dialogueEl = document.getElementById("roomDialogueBody");
     if (dialogueEl && theme.sceneText) dialogueEl.textContent = String(theme.sceneText);
-    // practice kit（接地气：冲突/信息差/救命句/2分钟开口）
-    try {
-      var kit = theme.practiceKit;
-      var wrap = document.getElementById("roomPracticeKit");
-      if (wrap) {
-        if (kit && typeof kit === "object") {
-          wrap.hidden = false;
-          var core = document.getElementById("roomPracticeCore");
-          if (core) core.textContent = kit.core_conflict ? String(kit.core_conflict) : "";
-          var warm = document.getElementById("roomPracticeWarmup");
-          if (warm) {
-            var roleName = typeof window.__roomGetMyRoleName === "function" ? window.__roomGetMyRoleName() : null;
-            var w = (kit.two_minute_warmup && roleName && kit.two_minute_warmup[roleName]) ? kit.two_minute_warmup[roleName] : "";
-            warm.textContent = w ? String(w) : "";
-          }
-          var infoA = document.getElementById("roomPracticeInfoA");
-          if (infoA) infoA.textContent = kit.info_gap && kit.info_gap.role_A_knows ? String(kit.info_gap.role_A_knows) : "-";
-          var infoB = document.getElementById("roomPracticeInfoB");
-          if (infoB) infoB.textContent = kit.info_gap && kit.info_gap.role_B_knows ? String(kit.info_gap.role_B_knows) : "-";
-          function joinLines(arr) {
-            return Array.isArray(arr) ? arr.map(function (s) { return "• " + String(s); }).join("\n") : "-";
-          }
-          var stuck = document.getElementById("roomPracticeStuck");
-          if (stuck) stuck.textContent = joinLines(kit.survival_phrases && kit.survival_phrases.when_stuck);
-          var disagree = document.getElementById("roomPracticeDisagree");
-          if (disagree) disagree.textContent = joinLines(kit.survival_phrases && kit.survival_phrases.when_disagree);
-          var time = document.getElementById("roomPracticeTime");
-          if (time) time.textContent = joinLines(kit.survival_phrases && kit.survival_phrases.when_time_pressed);
-        } else {
-          wrap.hidden = true;
-        }
-      }
-    } catch {}
     if (Array.isArray(theme.roles) && theme.roles.length >= 2) {
       if (typeof window.__roomSetThemeRoles === "function") {
         window.__roomSetThemeRoles(theme.roles);

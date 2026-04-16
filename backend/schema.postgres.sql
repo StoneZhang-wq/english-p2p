@@ -28,7 +28,6 @@ CREATE TABLE IF NOT EXISTS themes (
   preview_markdown TEXT,
   is_sandbox BOOLEAN NOT NULL DEFAULT FALSE,
   room_tasks_json JSONB,
-  practice_kit_json JSONB,
   llm_generated_at TIMESTAMPTZ,
   llm_prompt_version TEXT
 );
