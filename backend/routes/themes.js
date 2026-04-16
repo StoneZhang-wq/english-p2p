@@ -17,7 +17,7 @@ router.get("/by-id", async (req, res) => {
     }
     const pool = getPool();
     const { rows } = await pool.query(
-      `SELECT id, name, description, slug, theme_slot, scene_text, roles_json, cover_url, difficulty_level,
+      `SELECT id, name, description, slug, theme_slot, scene_text, practice_kit_json, roles_json, cover_url, difficulty_level,
         is_active, shanghai_week_monday::text AS week_monday, preview_markdown,
         COALESCE(is_sandbox, FALSE) AS is_sandbox,
         room_tasks_json,
@@ -39,6 +39,15 @@ router.get("/by-id", async (req, res) => {
         roomTasks = null;
       }
     }
+    let practiceKit = null;
+    if (r.practice_kit_json != null) {
+      try {
+        const raw = r.practice_kit_json;
+        practiceKit = typeof raw === "string" ? JSON.parse(raw) : raw;
+      } catch {
+        practiceKit = null;
+      }
+    }
     res.json({
       code: 0,
       message: "ok",
@@ -50,6 +59,7 @@ router.get("/by-id", async (req, res) => {
           slug: r.slug,
           themeSlot: Number(r.theme_slot),
           sceneText: r.scene_text,
+          practiceKit,
           roles: safeJsonParse(r.roles_json, []),
           coverUrl: r.cover_url,
           difficultyLevel: r.difficulty_level,

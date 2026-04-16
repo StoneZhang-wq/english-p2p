@@ -46,6 +46,7 @@ router.post("/rtc-token-booking", requireAuth, async (req, res) => {
               to_char(t.end_time, 'YYYY-MM-DD HH24:MI:SS') AS end_time,
               COALESCE(th.is_sandbox, FALSE) AS is_sandbox,
               th.room_tasks_json,
+              th.practice_kit_json,
               th.name AS theme_name,
               th.description AS theme_description,
               th.scene_text AS theme_scene_text,
@@ -65,6 +66,16 @@ router.post("/rtc-token-booking", requireAuth, async (req, res) => {
         roomTasks = typeof raw === "string" ? JSON.parse(raw) : raw;
       } catch {
         roomTasks = null;
+      }
+    }
+
+    let practiceKit = null;
+    if (slot.practice_kit_json != null) {
+      try {
+        const raw = slot.practice_kit_json;
+        practiceKit = typeof raw === "string" ? JSON.parse(raw) : raw;
+      } catch {
+        practiceKit = null;
       }
     }
 
@@ -99,6 +110,7 @@ router.post("/rtc-token-booking", requireAuth, async (req, res) => {
           name: slot.theme_name || null,
           description: slot.theme_description || null,
           sceneText: slot.theme_scene_text || null,
+          practiceKit,
           roles: themeRoles,
           previewMarkdown: slot.theme_preview_markdown || "",
         },
