@@ -8,6 +8,14 @@ const { chatCompletionText, isLlmConfigured } = require("./llmChat");
 
 const PROMPT_VERSION = "theme_pack_v4";
 
+/** 主题整包 JSON 较长，须显式提高 completion 上限，避免默认 max_tokens 截断导致 JSON.parse 失败 */
+function themeLlmMaxTokens() {
+  var raw = String(process.env.OPENAI_THEME_MAX_TOKENS || "8192").trim();
+  var n = parseInt(raw, 10);
+  if (!Number.isFinite(n) || n < 2048) return 8192;
+  return Math.min(n, 32768);
+}
+
 /** 去重参考：最近 N 条（非当前批次）主题 */
 const DEDUP_THEME_LIMIT = 12;
 
@@ -280,21 +288,33 @@ async function generateThemePack(seed, options) {
     { role: "user", content: user },
   ];
 
+  var maxTok = themeLlmMaxTokens();
   var text;
   try {
-    text = await chatCompletionText(msgs, { jsonMode: true });
+    text = await chatCompletionText(msgs, { jsonMode: true, maxTokens: maxTok });
   } catch (e1) {
     console.warn("[llm-theme] json_mode request failed, retry plain:", e1 && e1.message ? e1.message : e1);
-    text = await chatCompletionText(msgs, { jsonMode: false });
+    text = await chatCompletionText(msgs, { jsonMode: false, maxTokens: maxTok });
   }
 
   var parsed;
   try {
     parsed = JSON.parse(text);
-  } catch {
+  } catch (eParse) {
     var m = text.match(/\{[\s\S]*\}/);
-    if (!m) throw new Error("LLM 输出无法解析为 JSON");
-    parsed = JSON.parse(m[0]);
+    if (!m) {
+      throw new Error(
+        "LLM 输出无法解析为 JSON（可能被截断或非 JSON）。请重试；若仍失败请在 .env 设置 OPENAI_THEME_MAX_TOKENS=12288 或更高。原始错误：" +
+          (eParse && eParse.message ? eParse.message : String(eParse))
+      );
+    }
+    try {
+      parsed = JSON.parse(m[0]);
+    } catch (e2) {
+      throw new Error(
+        "LLM JSON 不完整或非法，请重试或增大 OPENAI_THEME_MAX_TOKENS。详情：" + (e2 && e2.message ? e2.message : String(e2))
+      );
+    }
   }
 
   var pack = validatePack(parsed);

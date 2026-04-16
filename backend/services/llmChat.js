@@ -18,7 +18,7 @@ function isLlmConfigured() {
 
 /**
  * @param {{ role: string; content: string }[]} messages
- * @param {{ jsonMode?: boolean }} [options]
+ * @param {{ jsonMode?: boolean; maxTokens?: number }} [options]
  * @returns {Promise<string>} assistant 文本（若 jsonMode 则为 JSON 字符串）
  */
 async function chatCompletionText(messages, options) {
@@ -40,6 +40,12 @@ async function chatCompletionText(messages, options) {
   if (options && options.jsonMode) {
     body.response_format = { type: "json_object" };
   }
+  if (options && options.maxTokens != null) {
+    const n = Math.floor(Number(options.maxTokens));
+    if (Number.isFinite(n) && n > 0) {
+      body.max_tokens = Math.min(n, 32768);
+    }
+  }
 
   const res = await fetch(url, {
     method: "POST",
@@ -51,6 +57,11 @@ async function chatCompletionText(messages, options) {
   });
 
   const raw = await res.text();
+  if (!raw || !String(raw).trim()) {
+    const err = new Error(`LLM 返回空响应体（HTTP ${res.status}），请检查网络与 OPENAI_BASE_URL`);
+    err.code = "LLM_EMPTY_BODY";
+    throw err;
+  }
   let json;
   try {
     json = JSON.parse(raw);
