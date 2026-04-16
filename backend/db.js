@@ -6,9 +6,7 @@ const {
   weekendEightPmSlotsInWeek,
   weekCycleEndsAtForWeekMonday,
 } = require("./utils/weekThemeCycle");
-const { pickThreeForWeek } = require("./data/themeRotationPool");
 const { ensureSandboxLab } = require("./services/sandboxLab");
-const { tryEnrichThemesWithLlm } = require("./services/themeLlmEnrichment");
 
 let pool;
 
@@ -77,6 +75,24 @@ async function migrateThemesLlmColumns(p) {
   await p.query(`ALTER TABLE themes ADD COLUMN IF NOT EXISTS llm_prompt_version TEXT`);
 }
 
+async function migrateThemeGenerationsTable(p) {
+  await p.query(`
+    CREATE TABLE IF NOT EXISTS theme_generations (
+      id SERIAL PRIMARY KEY,
+      created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+      created_by_email VARCHAR(120),
+      direction TEXT NOT NULL,
+      pack_json JSONB NOT NULL,
+      pack_version TEXT,
+      status VARCHAR(20) NOT NULL DEFAULT 'preview',
+      applied_theme_id INTEGER REFERENCES themes (id),
+      applied_at TIMESTAMPTZ
+    );
+  `);
+  await p.query(`CREATE INDEX IF NOT EXISTS idx_theme_generations_created_at ON theme_generations (created_at DESC)`);
+  await p.query(`CREATE INDEX IF NOT EXISTS idx_theme_generations_status ON theme_generations (status)`);
+}
+
 async function migrateWeeklyThemesColumns(p) {
   await p.query(`
     ALTER TABLE themes
@@ -137,26 +153,27 @@ async function ensureWeeklyThemeCycle(p) {
       [weekMon]
     );
     const n = cntRows[0].c;
-    const picks = pickThreeForWeek(weekMon);
 
     if (n === 0) {
       for (let slot = 0; slot < 3; slot++) {
-        const def = picks[slot];
         const slug = `w${String(weekMon).replace(/-/g, "")}_${slot}`;
         const { rows: ins } = await p.query(
           `INSERT INTO themes (name, description, difficulty_level, is_active, shanghai_week_monday, theme_slot, slug, scene_text, roles_json, cover_url, preview_markdown)
            VALUES ($1, $2, $3, 1, $4::date, $5, $6, $7, $8, $9, $10) RETURNING id`,
           [
-            def.name,
-            def.description,
-            def.difficulty_level,
+            `待生成主题 ${slot + 1}`,
+            "待管理员生成内容（请在 admin.html 中为该槽位输入方向并生成）。",
+            "intermediate",
             weekMon,
             slot,
             slug,
-            def.scene_text,
-            def.roles_json,
-            def.cover_url,
-            def.preview_markdown,
+            "【待生成】请在管理员后台为该主题生成场景背景。",
+            JSON.stringify([
+              { label: "ROLE 1", name: "角色A", desc: "【待生成】" },
+              { label: "ROLE 2", name: "角色B", desc: "【待生成】" },
+            ]),
+            "https://images.unsplash.com/photo-1521737604893-d14cc237f11d?w=800&q=80",
+            "# 学习目标\n- （待生成）\n\n# 核心词汇\n- （待生成）\n",
           ]
         );
         await ensureTimeslotsForThemeWeek(p, ins[0].id, weekMon);
@@ -172,22 +189,24 @@ async function ensureWeeklyThemeCycle(p) {
       const have = new Set(slotsHave.map((r) => Number(r.theme_slot)));
       for (let slot = 0; slot < 3; slot++) {
         if (have.has(slot)) continue;
-        const def = picks[slot];
         const slug = `w${String(weekMon).replace(/-/g, "")}_${slot}`;
         const { rows: ins } = await p.query(
           `INSERT INTO themes (name, description, difficulty_level, is_active, shanghai_week_monday, theme_slot, slug, scene_text, roles_json, cover_url, preview_markdown)
            VALUES ($1, $2, $3, 1, $4::date, $5, $6, $7, $8, $9, $10) RETURNING id`,
           [
-            def.name,
-            def.description,
-            def.difficulty_level,
+            `待生成主题 ${slot + 1}`,
+            "待管理员生成内容（请在 admin.html 中为该槽位输入方向并生成）。",
+            "intermediate",
             weekMon,
             slot,
             slug,
-            def.scene_text,
-            def.roles_json,
-            def.cover_url,
-            def.preview_markdown,
+            "【待生成】请在管理员后台为该主题生成场景背景。",
+            JSON.stringify([
+              { label: "ROLE 1", name: "角色A", desc: "【待生成】" },
+              { label: "ROLE 2", name: "角色B", desc: "【待生成】" },
+            ]),
+            "https://images.unsplash.com/photo-1521737604893-d14cc237f11d?w=800&q=80",
+            "# 学习目标\n- （待生成）\n\n# 核心词汇\n- （待生成）\n",
           ]
         );
         await ensureTimeslotsForThemeWeek(p, ins[0].id, weekMon);
@@ -213,14 +232,6 @@ async function runWeeklyThemeMaintenance() {
   } finally {
     client.release();
   }
-  try {
-    const r = await tryEnrichThemesWithLlm(pool);
-    if (r && !r.skipped && r.processed > 0) {
-      console.log("[llm-theme] maintenance: processed=%s ok=%s fail=%s", r.processed, r.ok, r.fail);
-    }
-  } catch (e) {
-    console.warn("[llm-theme] maintenance enrich:", e && e.message ? e.message : e);
-  }
 }
 
 async function initDb() {
@@ -238,6 +249,7 @@ async function initDb() {
     await migrateWeeklyThemesColumns(client);
     await migrateThemesSandboxFlag(client);
     await migrateThemesLlmColumns(client);
+    await migrateThemeGenerationsTable(client);
     await client.query(
       `UPDATE themes SET is_active = 0 WHERE shanghai_week_monday IS NULL AND COALESCE(is_sandbox, FALSE) = FALSE`
     );
@@ -246,15 +258,6 @@ async function initDb() {
     await ensureSandboxLab(client);
   } finally {
     client.release();
-  }
-
-  try {
-    const r = await tryEnrichThemesWithLlm(pool);
-    if (r && !r.skipped && r.processed > 0) {
-      console.log("[llm-theme] init pass: processed=%s ok=%s fail=%s", r.processed, r.ok, r.fail);
-    }
-  } catch (e) {
-    console.warn("[llm-theme] init enrich:", e && e.message ? e.message : e);
   }
 }
 

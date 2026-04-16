@@ -80,3 +80,19 @@ CREATE TABLE IF NOT EXISTS credit_logs (
 );
 
 CREATE INDEX IF NOT EXISTS idx_credit_logs_user ON credit_logs (user_id);
+
+-- AI 生成内容历史库（管理员可预览/应用/清理）
+CREATE TABLE IF NOT EXISTS theme_generations (
+  id SERIAL PRIMARY KEY,
+  created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  created_by_email VARCHAR(120),
+  direction TEXT NOT NULL,
+  pack_json JSONB NOT NULL,
+  pack_version TEXT,
+  status VARCHAR(20) NOT NULL DEFAULT 'preview',
+  applied_theme_id INTEGER REFERENCES themes (id),
+  applied_at TIMESTAMPTZ
+);
+
+CREATE INDEX IF NOT EXISTS idx_theme_generations_created_at ON theme_generations (created_at DESC);
+CREATE INDEX IF NOT EXISTS idx_theme_generations_status ON theme_generations (status);

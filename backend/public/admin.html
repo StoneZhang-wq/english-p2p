@@ -115,29 +115,17 @@
 
         <section class="room-tasks-panel">
           <div class="room-tasks-head">
-            <h3 class="room-tasks-heading">3) 周主题：轮换池种子 + LLM 刷新（管理员）</h3>
+            <h3 class="room-tasks-heading">3) 周主题：AI 生成预览 / 写入（管理员）</h3>
           </div>
           <div class="hint">
-            先对<strong>当前上架的 3 个主题</strong>分别「套用轮换池索引」，再点「整批 LLM 刷新」。刷新可能需数分钟，请勿重复点击。
-           生产环境推荐使用本区接口，无需开启 <code>ENABLE_DEV_PAIRING</code>。
+            先点「拉取当前活跃主题」，再为槽位 1/2/3 输入方向并「预览生成」，确认无误后再「写入槽位」。
+            每次预览会写入生成历史库（可回溯/清理）。生产环境无需开启 <code>ENABLE_DEV_PAIRING</code>。
           </div>
           <div class="admin-row">
-            <button id="btnLoadThemePool">拉取轮换池列表</button>
-            <button id="btnLoadThemePoolFull">拉取轮换池完整内容</button>
             <button id="btnLoadActiveThemes">拉取当前活跃主题</button>
             <button id="btnLoadActiveThemesFull">拉取当前活跃主题完整内容</button>
+            <button id="btnLoadGenerations">拉取最近生成记录</button>
           </div>
-          <div id="outThemePool" class="hint">（轮换池未加载）</div>
-          <details style="margin-top:10px">
-            <summary style="cursor:pointer;color:rgba(15,23,42,0.72)">轮换池原始 JSON</summary>
-            <pre id="outThemePoolRaw">（轮换池未加载）</pre>
-          </details>
-
-          <div id="outThemePoolFull" class="hint" style="margin-top:10px">（轮换池完整内容未加载）</div>
-          <details style="margin-top:10px">
-            <summary style="cursor:pointer;color:rgba(15,23,42,0.72)">轮换池完整内容原始 JSON</summary>
-            <pre id="outThemePoolFullRaw">（轮换池完整内容未加载）</pre>
-          </details>
 
           <div id="outActiveThemes" class="hint" style="margin-top:10px">（活跃主题未加载）</div>
           <details style="margin-top:10px">
@@ -150,17 +138,6 @@
             <summary style="cursor:pointer;color:rgba(15,23,42,0.72)">活跃主题完整内容原始 JSON</summary>
             <pre id="outActiveThemesFullRaw">（活跃主题完整内容未加载）</pre>
           </details>
-          <div class="admin-row" style="margin-top: 10px">
-            <label>
-              主题 id
-              <input id="applyThemeId" placeholder="来自上方「活跃主题」的 id" />
-            </label>
-            <label>
-              轮换池索引 pool_index
-              <input id="applyPoolIndex" placeholder="0 ～ N-1（可选）" />
-            </label>
-            <button id="btnApplyPoolIndex">套用轮换池种子（可选）</button>
-          </div>
 
           <div class="admin-row" style="margin-top: 10px">
             <label>
@@ -193,6 +170,31 @@
           <pre id="outThemePreview0">（槽位1预览未生成）</pre>
           <pre id="outThemePreview1">（槽位2预览未生成）</pre>
           <pre id="outThemePreview2">（槽位3预览未生成）</pre>
+
+          <div class="hint" style="margin-top:10px">最近生成记录（留痕 / 复查方向）</div>
+          <div id="outGenerations" class="hint">（生成记录未加载）</div>
+          <details style="margin-top:10px">
+            <summary style="cursor:pointer;color:rgba(15,23,42,0.72)">生成记录原始 JSON</summary>
+            <pre id="outGenerationsRaw">（生成记录未加载）</pre>
+          </details>
+        </section>
+
+        <section class="room-tasks-panel">
+          <div class="room-tasks-head">
+            <h3 class="room-tasks-heading">3.5) 清理 AI 生成记录（删除）</h3>
+          </div>
+          <div class="hint">
+            会删除早于保留天数的 <code>theme_generations</code> 记录（仅生成历史，不影响已写入主题的当前内容）。建议先预览，再确认删除。
+          </div>
+          <div class="admin-row">
+            <label>
+              保留天数 retention_days
+              <input id="genRetentionDays" placeholder="默认 30（范围 1～365）" />
+            </label>
+            <button id="btnGenHistoryPreview">预览将删除多少</button>
+            <button id="btnGenHistoryDelete">确认删除生成记录</button>
+          </div>
+          <pre id="outGenHistoryCleanup">（等待操作）</pre>
         </section>
 
         <section class="room-tasks-panel">
@@ -273,27 +275,6 @@
         el.innerHTML = '<table class="admin-table"><thead>' + thead + "</thead><tbody>" + tbody + "</tbody></table>";
       }
 
-      document.getElementById("btnLoadThemePool").addEventListener("click", async function () {
-        const out = document.getElementById("outThemePool");
-        const outRaw = document.getElementById("outThemePoolRaw");
-        out.textContent = "加载中…";
-        if (outRaw) outRaw.textContent = "加载中…";
-        try {
-          const json = await api("/api/admin/themes/pool");
-          const entries = (json && json.data && Array.isArray(json.data.pool)) ? json.data.pool : [];
-          renderTable(out, [
-            { h: "index", v: (r) => r.index },
-            { h: "name", v: (r) => r.name },
-            { h: "difficulty", v: (r) => r.difficultyLevel },
-            { h: "desc", v: (r) => r.description },
-          ], entries);
-          if (outRaw) outRaw.textContent = JSON.stringify(json, null, 2);
-        } catch (e) {
-          out.textContent = "失败：" + (e.message || e);
-          if (outRaw) outRaw.textContent = "失败：" + (e.message || e);
-        }
-      });
-
       document.getElementById("btnLoadStats").addEventListener("click", async function () {
         const out = document.getElementById("outStats");
         const outRaw = document.getElementById("outStatsRaw");
@@ -307,7 +288,6 @@
             { t: "今日新增", v: d.usersNewToday },
             { t: "近7日新增", v: d.usersNewLast7Days },
             { t: "主题总数（DB）", v: d.themesTotal },
-            { t: "主题池数量", v: d.themesPoolTotal },
             { t: "上架主题数", v: d.themesActiveTotal },
           ]);
           if (outRaw) outRaw.textContent = JSON.stringify(json, null, 2);
@@ -387,28 +367,6 @@
         }
       });
 
-      document.getElementById("btnLoadThemePoolFull").addEventListener("click", async function () {
-        const out = document.getElementById("outThemePoolFull");
-        const outRaw = document.getElementById("outThemePoolFullRaw");
-        out.textContent = "加载中…";
-        if (outRaw) outRaw.textContent = "加载中…";
-        try {
-          const json = await api("/api/admin/themes/pool-full");
-          const entries = (json && json.data && Array.isArray(json.data.pool)) ? json.data.pool : [];
-          renderTable(out, [
-            { h: "index", v: (r) => r.index },
-            { h: "name", v: (r) => r.name },
-            { h: "difficulty", v: (r) => r.difficultyLevel },
-            { h: "scene", v: (r) => (r.sceneText || "").slice(0, 60) + ((r.sceneText || "").length > 60 ? "…" : "") },
-            { h: "roles", v: (r) => Array.isArray(r.roles) ? r.roles.map((x) => x.name).filter(Boolean).join(" / ") : "" },
-          ], entries);
-          if (outRaw) outRaw.textContent = JSON.stringify(json, null, 2);
-        } catch (e) {
-          out.textContent = "失败：" + (e.message || e);
-          if (outRaw) outRaw.textContent = "失败：" + (e.message || e);
-        }
-      });
-
       document.getElementById("btnLoadActiveThemesFull").addEventListener("click", async function () {
         const out = document.getElementById("outActiveThemesFull");
         const outRaw = document.getElementById("outActiveThemesFullRaw");
@@ -432,20 +390,26 @@
         }
       });
 
-      document.getElementById("btnApplyPoolIndex").addEventListener("click", async function () {
-        const themeId = val("applyThemeId");
-        const poolIndex = val("applyPoolIndex");
-        const out = document.getElementById("outThemeOps");
-        out.textContent = "提交中…";
+      document.getElementById("btnLoadGenerations").addEventListener("click", async function () {
+        const out = document.getElementById("outGenerations");
+        const outRaw = document.getElementById("outGenerationsRaw");
+        out.textContent = "加载中…";
+        if (outRaw) outRaw.textContent = "加载中…";
         try {
-          const json = await api("/api/admin/themes/" + encodeURIComponent(themeId) + "/apply-pool-index", {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ pool_index: Number(poolIndex) }),
-          });
-          out.textContent = JSON.stringify(json, null, 2);
+          const json = await api("/api/admin/generations?limit=30");
+          const entries = (json && json.data && Array.isArray(json.data.generations)) ? json.data.generations : [];
+          renderTable(out, [
+            { h: "id", v: (r) => r.id },
+            { h: "created_at", v: (r) => r.createdAt || "" },
+            { h: "status", v: (r) => r.status || "" },
+            { h: "direction", v: (r) => r.direction || "" },
+            { h: "pack_name", v: (r) => r.packName || "" },
+            { h: "applied_theme", v: (r) => r.appliedThemeId == null ? "" : String(r.appliedThemeId) },
+          ], entries);
+          if (outRaw) outRaw.textContent = JSON.stringify(json, null, 2);
         } catch (e) {
           out.textContent = "失败：" + (e.message || e);
+          if (outRaw) outRaw.textContent = "失败：" + (e.message || e);
         }
       });
 
@@ -465,9 +429,9 @@
       });
 
       function parseActiveThemesJson() {
-        const out = document.getElementById("outActiveThemes");
+        const out = document.getElementById("outActiveThemesRaw");
         try {
-          const obj = JSON.parse(out.textContent);
+          const obj = JSON.parse(out.textContent || out.innerText || "");
           return obj && obj.data && Array.isArray(obj.data.themes) ? obj.data.themes : [];
         } catch {
           return [];
@@ -499,7 +463,12 @@
           });
           out.textContent = JSON.stringify(json, null, 2);
           // 保存预览到 window 状态，供确认写入使用
-          window[slotPreviewStateKey(slot)] = { themeId: t.id, direction, preview: json && json.data ? json.data.preview : null };
+          window[slotPreviewStateKey(slot)] = {
+            themeId: t.id,
+            direction,
+            generationId: json && json.data ? (json.data.generationId || null) : null,
+            preview: json && json.data ? json.data.preview : null
+          };
           const previewOut = document.getElementById("outThemePreview" + String(slot));
           if (previewOut) previewOut.textContent = JSON.stringify(window[slotPreviewStateKey(slot)], null, 2);
           const commitBtn = document.getElementById("btnCommit" + String(slot));
@@ -521,16 +490,9 @@
           const json = await api("/api/admin/themes/" + encodeURIComponent(String(st.themeId)) + "/commit-generated-pack", {
             method: "POST",
             headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ direction: st.direction, pack: st.preview }),
+            body: JSON.stringify({ direction: st.direction, pack: st.preview, generation_id: st.generationId || null }),
           });
           out.textContent = JSON.stringify(json, null, 2);
-          // 写入后刷新活跃主题（含完整内容）
-          try {
-            const latest = await api("/api/admin/themes/active");
-            document.getElementById("outActiveThemes").textContent = JSON.stringify(latest, null, 2);
-            const latestFull = await api("/api/admin/themes/active-full");
-            document.getElementById("outActiveThemesFull").textContent = JSON.stringify(latestFull, null, 2);
-          } catch {}
           const commitBtn = document.getElementById("btnCommit" + String(slot));
           if (commitBtn) commitBtn.disabled = true;
         } catch (e) {
@@ -606,6 +568,34 @@
         out.textContent = "删除中…";
         try {
           const json = await api("/api/admin/timeslots/history-delete", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ retention_days: days, confirm: true }),
+          });
+          out.textContent = JSON.stringify(json, null, 2);
+        } catch (e) {
+          out.textContent = "失败：" + (e.message || e);
+        }
+      });
+
+      document.getElementById("btnGenHistoryPreview").addEventListener("click", async function () {
+        const out = document.getElementById("outGenHistoryCleanup");
+        const days = val("genRetentionDays") || "30";
+        out.textContent = "加载中…";
+        try {
+          const json = await api("/api/admin/generations/history-preview?retention_days=" + encodeURIComponent(days));
+          out.textContent = JSON.stringify(json, null, 2);
+        } catch (e) {
+          out.textContent = "失败：" + (e.message || e);
+        }
+      });
+
+      document.getElementById("btnGenHistoryDelete").addEventListener("click", async function () {
+        const out = document.getElementById("outGenHistoryCleanup");
+        const days = Number(val("genRetentionDays") || "30");
+        out.textContent = "删除中…";
+        try {
+          const json = await api("/api/admin/generations/history-delete", {
             method: "POST",
             headers: { "Content-Type": "application/json" },
             body: JSON.stringify({ retention_days: days, confirm: true }),

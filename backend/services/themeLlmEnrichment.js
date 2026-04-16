@@ -1,7 +1,8 @@
 /**
- * 按周主题种子调用 LLM，生成完整展示字段 + room_tasks_json，写回 themes。
- * - 批处理：仅处理 llm_generated_at IS NULL 且非沙箱的活跃主题；每轮最多 3 条。
- * - v2：任务 5～7 条规范为 6 条；预习更丰满；用最近 12 个主题摘要做场景去重；落库时保留种子 cover_url。
+ * 调用 LLM 生成“主题整包”（场景、角色、预习、room_tasks_json），供管理员预览并写回 themes。
+ * - 批处理：当前仓库已不在 init/周维护中自动执行（以管理员操作为准），但仍保留服务函数供显式调用。
+ * - v2：任务 5～7 条规范为 6 条；预习更丰满；用最近 12 个主题摘要做场景去重。
+ * - v3：按角色拆分任务集（每角色 6 条），并支持管理员传入 direction（方向）。
  */
 
 const { chatCompletionText, isLlmConfigured } = require("./llmChat");
@@ -157,7 +158,7 @@ function validatePack(obj) {
 }
 
 /**
- * 保留轮换池/库表现有封面：以种子 cover为准（有合法 URL 时覆盖模型输出）。
+ * 保留库表现有封面：以 seed cover 为准（有合法 URL 时覆盖模型输出）。
  * @param {{ cover_url: string } & Record<string, unknown>} pack
  * @param {{ cover_url?: string }} seed
  */

@@ -1,7 +1,6 @@
 const express = require("express");
 const { getPool } = require("../db");
 const { requireAdmin } = require("../middleware/requireAdmin");
-const { POOL } = require("../data/themeRotationPool");
 const {
   refreshActiveThemesWithLlm,
   generateThemePack,
@@ -47,7 +46,6 @@ router.get("/stats", requireAdmin, async (_req, res) => {
         usersNewToday: uToday[0]?.c || 0,
         usersNewLast7Days: u7[0]?.c || 0,
         themesTotal: thCnt[0]?.c || 0,
-        themesPoolTotal: POOL.length,
         themesActiveTotal: thActive[0]?.c || 0,
       },
     });
@@ -192,6 +190,156 @@ router.post("/timeslots/history-delete", requireAdmin, async (req, res) => {
     res.status(500).json({ code: 500, message: "服务器错误", data: null });
   } finally {
     client.release();
+  }
+});
+
+async function getGenerationCleanupTargets(pool, retentionDays) {
+  const { rows } = await pool.query(
+    `SELECT id
+     FROM theme_generations
+     WHERE created_at < (NOW() - ($1::int * INTERVAL '1 day'))
+     ORDER BY created_at ASC
+     LIMIT 5000`,
+    [retentionDays]
+  );
+  const ids = rows.map((r) => Number(r.id)).filter((x) => Number.isInteger(x));
+  return { ids };
+}
+
+// GET /api/admin/generations/history-preview?retention_days=30
+router.get("/generations/history-preview", requireAdmin, async (req, res) => {
+  const retentionDays = parseRetentionDays(req.query?.retention_days, 30);
+  try {
+    const pool = getPool();
+    const t = await getGenerationCleanupTargets(pool, retentionDays);
+    res.json({
+      code: 0,
+      message: "ok",
+      data: {
+        retentionDays,
+        generationsToDelete: t.ids.length,
+        sampleGenerationIds: t.ids.slice(0, 30),
+      },
+    });
+  } catch (e) {
+    console.error("[admin] GET generations/history-preview", e);
+    res.status(500).json({ code: 500, message: "服务器错误", data: null });
+  }
+});
+
+// POST /api/admin/generations/history-delete  Body: { retention_days: number, confirm: true }
+router.post("/generations/history-delete", requireAdmin, async (req, res) => {
+  const retentionDays = parseRetentionDays(req.body?.retention_days, 30);
+  const confirm = req.body?.confirm === true;
+  if (!confirm) {
+    return res.status(400).json({ code: 400, message: "需 confirm=true 才会执行删除", data: null });
+  }
+  try {
+    const pool = getPool();
+    const t = await getGenerationCleanupTargets(pool, retentionDays);
+    if (!t.ids.length) {
+      return res.json({ code: 0, message: "ok", data: { retentionDays, deletedGenerations: 0 } });
+    }
+    const del = await pool.query(`DELETE FROM theme_generations WHERE id = ANY($1::int[])`, [t.ids]);
+    res.json({ code: 0, message: "ok", data: { retentionDays, deletedGenerations: del.rowCount || 0 } });
+  } catch (e) {
+    console.error("[admin] POST generations/history-delete", e);
+    res.status(500).json({ code: 500, message: "服务器错误", data: null });
+  }
+});
+
+// GET /api/admin/generations?limit=30
+router.get("/generations", requireAdmin, async (req, res) => {
+  const limit = Math.max(1, Math.min(100, Math.floor(Number(req.query?.limit || 30) || 30)));
+  try {
+    const pool = getPool();
+    const { rows } = await pool.query(
+      `SELECT id,
+              created_at::text AS created_at,
+              created_by_email,
+              direction,
+              status,
+              applied_theme_id,
+              applied_at::text AS applied_at,
+              pack_version,
+              (pack_json->>'name') AS pack_name,
+              LEFT(COALESCE(pack_json->>'scene_text', ''), 120) AS scene_preview
+       FROM theme_generations
+       ORDER BY created_at DESC
+       LIMIT $1`,
+      [limit]
+    );
+    res.json({
+      code: 0,
+      message: "ok",
+      data: {
+        generations: rows.map((r) => ({
+          id: Number(r.id),
+          createdAt: r.created_at,
+          createdByEmail: r.created_by_email || null,
+          direction: r.direction,
+          status: r.status,
+          appliedThemeId: r.applied_theme_id != null ? Number(r.applied_theme_id) : null,
+          appliedAt: r.applied_at || null,
+          packVersion: r.pack_version || null,
+          packName: r.pack_name || "",
+          scenePreview: r.scene_preview || "",
+        })),
+      },
+    });
+  } catch (e) {
+    console.error("[admin] GET generations", e);
+    res.status(500).json({ code: 500, message: "服务器错误", data: null });
+  }
+});
+
+// GET /api/admin/generations/:id
+router.get("/generations/:id", requireAdmin, async (req, res) => {
+  const id = Number(req.params.id);
+  if (!id || Number.isNaN(id)) {
+    return res.status(400).json({ code: 400, message: "generation id 无效", data: null });
+  }
+  try {
+    const pool = getPool();
+    const { rows } = await pool.query(
+      `SELECT id,
+              created_at::text AS created_at,
+              created_by_email,
+              direction,
+              status,
+              applied_theme_id,
+              applied_at::text AS applied_at,
+              pack_version,
+              pack_json
+       FROM theme_generations
+       WHERE id = $1
+       LIMIT 1`,
+      [id]
+    );
+    const r = rows[0];
+    if (!r) {
+      return res.status(404).json({ code: 404, message: "生成记录不存在", data: null });
+    }
+    res.json({
+      code: 0,
+      message: "ok",
+      data: {
+        generation: {
+          id: Number(r.id),
+          createdAt: r.created_at,
+          createdByEmail: r.created_by_email || null,
+          direction: r.direction,
+          status: r.status,
+          appliedThemeId: r.applied_theme_id != null ? Number(r.applied_theme_id) : null,
+          appliedAt: r.applied_at || null,
+          packVersion: r.pack_version || null,
+          pack: r.pack_json,
+        },
+      },
+    });
+  } catch (e) {
+    console.error("[admin] GET generations/:id", e);
+    res.status(500).json({ code: 500, message: "服务器错误", data: null });
   }
 });
 
@@ -432,7 +580,7 @@ router.post("/timeslots/:id/pair", requireAdmin, async (req, res) => {
   }
 });
 
-// —— 周主题：轮换池种子 + LLM 整批刷新（仅 ADMIN_EMAILS） ——
+// —— 周主题：LLM 刷新 / 按方向生成（仅 ADMIN_EMAILS） ——
 
 // GET /api/admin/themes/active
 router.get("/themes/active", requireAdmin, async (_req, res) => {
@@ -470,42 +618,6 @@ router.get("/themes/active", requireAdmin, async (_req, res) => {
     });
   } catch (e) {
     console.error("[admin] GET themes/active", e);
-    res.status(500).json({ code: 500, message: "服务器错误", data: null });
-  }
-});
-
-// GET /api/admin/themes/pool  （轮换池索引列表，供套用种子）
-router.get("/themes/pool", requireAdmin, async (_req, res) => {
-  try {
-    const entries = POOL.map((p, i) => ({
-      index: i,
-      name: p.name,
-      description: p.description,
-      difficultyLevel: p.difficulty_level,
-    }));
-    res.json({ code: 0, message: "ok", data: { pool: entries, count: POOL.length } });
-  } catch (e) {
-    console.error("[admin] GET themes/pool", e);
-    res.status(500).json({ code: 500, message: "服务器错误", data: null });
-  }
-});
-
-// GET /api/admin/themes/pool-full  （轮换池完整内容）
-router.get("/themes/pool-full", requireAdmin, async (_req, res) => {
-  try {
-    const full = POOL.map((p, i) => ({
-      index: i,
-      name: p.name,
-      description: p.description,
-      difficultyLevel: p.difficulty_level,
-      sceneText: p.scene_text,
-      roles: safeJsonParse(p.roles_json, []),
-      coverUrl: p.cover_url,
-      previewMarkdown: p.preview_markdown,
-    }));
-    res.json({ code: 0, message: "ok", data: { pool: full, count: POOL.length } });
-  } catch (e) {
-    console.error("[admin] GET themes/pool-full", e);
     res.status(500).json({ code: 500, message: "服务器错误", data: null });
   }
 });
@@ -608,12 +720,30 @@ router.post("/themes/:id/generate-preview-by-direction", requireAdmin, async (re
       { recentDedup, direction }
     );
 
+    const genPackForDb = {
+      name: pack.name,
+      description: pack.description,
+      difficulty_level: pack.difficulty_level || row.difficulty_level || "intermediate",
+      scene_text: pack.scene_text,
+      roles_json: pack.roles_json,
+      preview_markdown: pack.preview_markdown,
+      cover_url: pack.cover_url,
+      room_tasks_payload: pack.room_tasks_payload,
+    };
+    const ins = await pool.query(
+      `INSERT INTO theme_generations (created_by_email, direction, pack_json, pack_version, status)
+       VALUES ($1, $2, $3::jsonb, $4, 'preview')
+       RETURNING id`,
+      [req.user?.email || null, direction, JSON.stringify(genPackForDb), PROMPT_VERSION || "theme_pack_v3"]
+    );
+
     res.json({
       code: 0,
       message: "ok",
       data: {
         themeId,
         direction,
+        generationId: Number(ins.rows?.[0]?.id) || null,
         preview: {
           name: pack.name,
           description: pack.description,
@@ -636,11 +766,14 @@ router.post("/themes/:id/generate-preview-by-direction", requireAdmin, async (re
   }
 });
 
-// POST /api/admin/themes/:id/commit-generated-pack  Body: { direction: string, pack: object }
+// POST /api/admin/themes/:id/commit-generated-pack  Body: { direction: string, pack: object, generation_id?: number }
 router.post("/themes/:id/commit-generated-pack", requireAdmin, async (req, res) => {
   const themeId = Number(req.params.id);
   const direction = String(req.body?.direction || "").trim();
   const packRaw = req.body?.pack;
+  const generationId =
+    req.body?.generation_id != null ? Number(req.body.generation_id) :
+    (req.body?.generationId != null ? Number(req.body.generationId) : null);
   if (!themeId || Number.isNaN(themeId)) {
     return res.status(400).json({ code: 400, message: "theme id 无效", data: null });
   }
@@ -701,10 +834,22 @@ router.post("/themes/:id/commit-generated-pack", requireAdmin, async (req, res) 
     if (upd.rowCount !== 1) {
       return res.status(500).json({ code: 500, message: "更新主题失败", data: null });
     }
+
+    if (generationId && Number.isInteger(generationId)) {
+      await pool.query(
+        `UPDATE theme_generations
+         SET status = 'applied',
+             applied_theme_id = $1,
+             applied_at = NOW()
+         WHERE id = $2`,
+        [themeId, generationId]
+      );
+    }
+
     res.json({
       code: 0,
       message: "ok",
-      data: { themeId, direction, llmPromptVersion: PROMPT_VERSION },
+      data: { themeId, direction, llmPromptVersion: PROMPT_VERSION, generationId: generationId || null },
     });
   } catch (e) {
     const code = e && e.code;
@@ -714,67 +859,6 @@ router.post("/themes/:id/commit-generated-pack", requireAdmin, async (req, res) 
     console.error("[admin] POST themes/commit-generated-pack", e);
     const msg = e && e.message ? e.message : "服务器错误";
     return res.status(500).json({ code: 500, message: msg, data: null });
-  }
-});
-
-// POST /api/admin/themes/:id/apply-pool-index  Body: { pool_index: number }
-router.post("/themes/:id/apply-pool-index", requireAdmin, async (req, res) => {
-  const themeId = Number(req.params.id);
-  const poolIndex = Number(req.body?.pool_index != null ? req.body.pool_index : req.body?.poolIndex);
-  if (!themeId || Number.isNaN(themeId)) {
-    return res.status(400).json({ code: 400, message: "theme id 无效", data: null });
-  }
-  if (!Number.isInteger(poolIndex) || poolIndex < 0 || poolIndex >= POOL.length) {
-    return res.status(400).json({
-      code: 400,
-      message: "pool_index 须为 0～" + (POOL.length - 1) + " 的整数",
-      data: null,
-    });
-  }
-  const def = POOL[poolIndex];
-  try {
-    const pool = getPool();
-    const upd = await pool.query(
-      `UPDATE themes SET
-         name = $1,
-         description = $2,
-         difficulty_level = $3,
-         scene_text = $4,
-         roles_json = $5,
-         cover_url = $6,
-         preview_markdown = $7,
-         llm_generated_at = NULL,
-         llm_prompt_version = NULL,
-         room_tasks_json = NULL
-       WHERE id = $8
-         AND is_active = 1
-         AND COALESCE(is_sandbox, FALSE) = FALSE`,
-      [
-        def.name,
-        def.description,
-        def.difficulty_level,
-        def.scene_text,
-        def.roles_json,
-        def.cover_url,
-        def.preview_markdown,
-        themeId,
-      ]
-    );
-    if (upd.rowCount !== 1) {
-      return res.status(404).json({
-        code: 404,
-        message: "未更新：主题不存在、非当前上架(is_active)或为沙箱",
-        data: null,
-      });
-    }
-    res.json({
-      code: 0,
-      message: "ok",
-      data: { themeId, poolIndex, seedName: def.name },
-    });
-  } catch (e) {
-    console.error("[admin] POST themes/apply-pool-index", e);
-    res.status(500).json({ code: 500, message: "服务器错误", data: null });
   }
 });
 

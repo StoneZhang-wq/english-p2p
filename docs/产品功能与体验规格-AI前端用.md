@@ -119,7 +119,7 @@
 
 ## 6. 主题与任务卡（产品）
 
-- **主题**：MVP 为**每周轮换 3 个主题**（见产品第 5.1、8.1）；首页 `GET /api/themes`、预约 `theme_id`。服务端可用 **豆包方舟等**（OpenAI 兼容）对轮换池种子做 enrichment 写入 `themes`（含 `room_tasks_json`）；见第 5.6 节与 `ARCHITECTURE` 6.8。  
+- **主题**：MVP 为**每周轮换 3 个主题**（见产品第 5.1、8.1）；首页 `GET /api/themes`、预约 `theme_id`。主题内容由管理员在 `admin.html` 通过 AI 生成并写入 `themes`（含 `room_tasks_json`），并在 `theme_generations` 中留痕可清理；见 `ARCHITECTURE.md` 的管理员接口与 LLM 章节。
 - **任务卡**：可由 LLM 生成；**同一主题 MVP 共用一套任务卡**；房间内展示**双方角色与信息差**。  
 - **迭代**：可按水平生成不同难度任务卡（后期）。
 

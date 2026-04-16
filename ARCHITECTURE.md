@@ -38,7 +38,7 @@ project-root/
 │   ├── controllers/      # 业务逻辑
 │   ├── models/           # 数据访问（PostgreSQL / pg）
 │   ├── services/         # 邮件、短信、Agora Token、**预习 docx 生成**（`buildPreviewMaterialDocx.js`）等
-│   ├── data/             # 静态配置（如 `themeRotationPool.js` 周主题轮换池）
+│   ├── data/             # 静态配置（如未来的固定文案/常量等；当前不再使用轮换池/种子）
 │   ├── utils/            # 验证码、配对算法、**周末场次规则**（`weekendSlotRules.js`）、**周主题周期**（`weekThemeCycle.js`）等
 │   ├── cron/             # 定时任务（配对、停配扫描、开场互配等）
 │   ├── public/           # 前端静态页（HTML/CSS/JS，express.static）；含 `dev-lab.html`（沙箱验收入口）
@@ -181,15 +181,16 @@ CREATE TABLE credit_logs (
 | POST | `/api/admin/timeslots/:id/unpair` | Body：`{ pair_id }`；删除该场次指定 pairs |
 | GET | `/api/admin/themes/active` | 当前 `is_active` 的正式周主题**至多 3 条**（含 id、槽位、周、LLM 版本摘要） |
 | GET | `/api/admin/themes/active-full` | 当前上架 3 个正式主题的**完整内容**（场景、角色、预习、room_tasks_json 等） |
-| GET | `/api/admin/themes/pool` | `themeRotationPool.js` 轮换池**索引列表**（供套用种子） |
-| GET | `/api/admin/themes/pool-full` | 轮换池 `POOL` 的**完整内容**（含场景/角色/预习/封面等） |
-| POST | `/api/admin/themes/:id/apply-pool-index` | Body：`{ pool_index }`（整数）。将 `POOL[pool_index]` 写入该主题的种子字段，并清空 `llm_generated_at` / `room_tasks_json`；**仅**当该行 `is_active=1` 且非沙箱 |
-| GET | `/api/admin/stats` | 注册总数、今日新增、近7日新增；主题总数、轮换池数量、上架主题数等 |
+| GET | `/api/admin/stats` | 注册总数、今日新增、近7日新增；主题总数、上架主题数等 |
 | GET | `/api/admin/current-overview` | 当前上架 3 主题的“当前场次”概览：场次列表 + 预约用户（含 level）+ pairs（含双方 level） |
 | GET | `/api/admin/timeslots/history-preview` | Query：`retention_days`（1～365，默认30）。返回将删除的历史场次数量与 bookings/pairs 数量，以及 sample ids（不执行删除）。 |
 | POST | `/api/admin/timeslots/history-delete` | Body：`{ retention_days, confirm:true }`。硬删除已结束且早于保留期的历史场次，并级联删除关联 bookings/pairs。 |
-| POST | `/api/admin/themes/:id/generate-preview-by-direction` | Body：`{ direction }`（字符串）。仅**生成预览**（不写库），返回场景/角色/预习/任务等整包 JSON。 |
-| POST | `/api/admin/themes/:id/commit-generated-pack` | Body：`{ direction, pack }`。将上一步预览的 `pack` 通过服务端校验后**写入 themes**（封面仍保留当前行 `cover_url`）。 |
+| GET | `/api/admin/generations` | Query：`limit`（默认30）。最近的 AI 生成记录列表（`theme_generations`） |
+| GET | `/api/admin/generations/:id` | 单条 AI 生成记录详情（含 `pack_json`） |
+| GET | `/api/admin/generations/history-preview` | Query：`retention_days`（1～365，默认30）。预览将删除多少条生成记录（不执行删除）。 |
+| POST | `/api/admin/generations/history-delete` | Body：`{ retention_days, confirm:true }`。硬删除早于保留期的生成记录（不影响已写入主题）。 |
+| POST | `/api/admin/themes/:id/generate-preview-by-direction` | Body：`{ direction }`（字符串）。生成整包预览，并写入 `theme_generations` 留痕（status=`preview`），返回 `generationId` + 场景/角色/预习/任务等 JSON。 |
+| POST | `/api/admin/themes/:id/commit-generated-pack` | Body：`{ direction, pack, generation_id? }`。将预览 `pack` 通过服务端校验后**写入 themes**（默认保留当前行 `cover_url`）；若带 `generation_id`，会将对应生成记录标记为 `applied`。 |
 | POST | `/api/admin/themes/llm-refresh-active` | 无 Body。与 `POST /api/dev/theme-llm-refresh-active` 同逻辑，**须 `ADMIN_EMAILS`**，**生产可用**；并发第二次返回 **409**（`REFRESH_IN_PROGRESS`） |
 
 **开发调试（非正式配对）**：当 `NODE_ENV !== 'production'` **或** `ENABLE_DEV_PAIRING=1` 时挂载 `routes/devPairing.js`（否则不注册该路径）：
@@ -197,7 +198,7 @@ CREATE TABLE credit_logs (
 | 方法 | 路径 | 说明 |
 |------|------|------|
 | POST | `/api/dev/pair-timeslot` | Body：`{ timeslot_id }`（整数）。**须登录**；调用者须在该场次有 `confirmed` 预约，且存在另一名同场次预约者与其**口语等级差≤1**（`utils/levelCompatibility.js`）；事务内 **删除该场次全部 `pairs`** 后 **INSERT** 一行（`channel_name` 形如 `dev_eng_{timeslotId}_{ts}`，满足声网频道字符集）。**禁止**在生产长期开启 `ENABLE_DEV_PAIRING`；用于**早于开场**强制造 `pairs` 的调试，与正常「开场后 `runAutoPairingScan`」不同。 |
-| POST | `/api/dev/theme-llm-rerun` | Body：`{ theme_id }`（整数）。**须登录**；清空该主题 `llm_generated_at` / `room_tasks_json` / `llm_prompt_version` 并**立即**调用 LLM 写回（**消耗额度**）。写回后**保留**该行既有 `cover_url`（轮换池封面）。仅**非沙箱**且 `shanghai_week_monday` 非空之主题；与 `pair-timeslot` 同开关（`NODE_ENV` 非 production 或 `ENABLE_DEV_PAIRING=1`）。 |
+| POST | `/api/dev/theme-llm-rerun` | Body：`{ theme_id }`（整数）。**须登录**；清空该主题 `llm_generated_at` / `room_tasks_json` / `llm_prompt_version` 并**立即**调用 LLM 写回（**消耗额度**）。写回后默认**保留**该行既有 `cover_url`。仅**非沙箱**且 `shanghai_week_monday` 非空之主题；与 `pair-timeslot` 同开关（`NODE_ENV` 非 production 或 `ENABLE_DEV_PAIRING=1`）。 |
 | POST | `/api/dev/theme-llm-refresh-active` | **须登录**，无 Body。对当前 `is_active=1` 的**至多 3 条**非沙箱周主题**顺序**调用 LLM 整包覆盖（`theme_pack_v2`：任务模型输出 5～7 条、落库规范为 **6** 条；预习 Markdown 更丰满；注入**最近 12 个主题**场景摘要做去重参考）；**保留**各行 `cover_url`。与 `pair-timeslot` 同开关。 |
 
 **沙箱实验室（见第 6.7 节）**：**已实现** — `GET /api/dev/sandbox-lab`、`POST /api/dev/sandbox-slot/refresh`（须登录；仅非生产或 `ENABLE_SANDBOX_LAB=1`）；`public/dev-lab.html`；`themes.is_sandbox`、`services/sandboxLab.js`、`initDb` 内 `ensureSandboxLab`。
@@ -280,7 +281,7 @@ CREATE TABLE credit_logs (
 
 ### 6.8 LLM 内容生成（OpenAI 兼容接口，与 `docs/产品描述.md` 第 8.3 节一致）
 
-**目标**：主题名、描述、场景、角色、**更丰满的**预习 Markdown、房间任务（英文 hints）由服务端调用 **OpenAI Chat Completions 兼容** API（豆包方舟等）生成后**落库**；**`cover_url`** 以轮换池写入为准，LLM 批处理与刷新接口**不替换**封面 URL。前端通过 `GET /api/themes/by-id` 与 **`POST /api/agora/rtc-token-booking`** 的 `theme` / `roomTasks` 字段读取。
+**目标**：主题名、描述、场景、角色、**更丰满的**预习 Markdown、房间任务（英文 hints）由服务端调用 **OpenAI Chat Completions 兼容** API（豆包方舟等）生成后**落库**；`themes.cover_url` 可由运营预置，AI 写回时默认**不替换**该行封面 URL。前端通过 `GET /api/themes/by-id` 与 **`POST /api/agora/rtc-token-booking`** 的 `theme` / `roomTasks` 字段读取。
 
 **已实现**：
 
@@ -288,11 +289,11 @@ CREATE TABLE credit_logs (
 |----|------|
 | 凭据与端点 | 环境变量 **`OPENAI_API_KEY`**、**`OPENAI_BASE_URL`**（可填完整 `.../chat/completions` 或只填 `https://ark.../api/v3`）、**`OPENAI_MODEL`**（方舟常为 `ep-xxxx`）；可选 **`MODEL_PROVIDER`**（日志用，如 `doubao`） |
 | 服务模块 | `services/llmChat.js`（HTTP `fetch`）、`services/themeLlmEnrichment.js`（`theme_pack_v3`：支持管理员指定方向；JSON 校验；`tryEnrichThemesWithLlm`、`refreshActiveThemesWithLlm`、`rerunThemeLlmForDev`；生成时注入**最近 12 个主题**场景摘录以避免撞场景） |
-| 存储 | `themes.room_tasks_json`（JSONB：v3 推荐形态 `{ version: 3, byRole: { [roleName]: Task[6] } }`，每角色 6 条；兼容旧数组形态）、`themes.llm_generated_at`、`themes.llm_prompt_version`；其余覆盖 `name`、`description`、`scene_text`、`roles_json`、`preview_markdown`、`difficulty_level`；**`cover_url` 在 LLM 写回时用种子行原值保留** |
+| 存储 | `themes.room_tasks_json`（JSONB：v3 推荐形态 `{ version: 3, byRole: { [roleName]: Task[6] } }`，每角色 6 条；兼容旧数组形态）、`themes.llm_generated_at`、`themes.llm_prompt_version`；其余覆盖 `name`、`description`、`scene_text`、`roles_json`、`preview_markdown`、`difficulty_level`；`cover_url` 默认保留 |
 | 触发 | **`initDb` 结束后**尝试一轮；**`runWeeklyThemeMaintenance`（每 10 分钟）**后再尝试；每次最多 **3** 条 `llm_generated_at IS NULL` 且**非沙箱**的周主题 |
 | 整批刷新当前周 | **推荐生产**：**`POST /api/admin/themes/llm-refresh-active`**（须 `ADMIN_EMAILS`）。**调试**：`POST /api/dev/theme-llm-refresh-active`（须 `ENABLE_DEV_PAIRING=1` 或非 production）。对当前 `is_active` 的至多 **3** 条正式主题顺序重生成；**并发第二次409**（`REFRESH_IN_PROGRESS`） |
 | 房间展示 | `room-agora.js` 首次 `rtc-token-booking` 成功后调用 `window.__applyRoomTasksFromApi(roomTasks)`；无 `room_tasks_json` 时保留 `room.html` 默认静态任务 |
-| 未配置 Key | `tryEnrichThemesWithLlm` 直接跳过；种子数据仍来自 `themeRotationPool` |
+| 未配置 Key | 生成与刷新接口返回 503（`LLM_NOT_CONFIGURED`）；主题仍可保持占位内容，等待管理员生成 |
 
 ---
 
@@ -321,7 +322,7 @@ SMS_ACCESS_SECRET=
 # 以下为规划能力（未实现时留空即可）
 ENABLE_DEV_PAIRING=0
 ENABLE_SANDBOX_LAB=0
-# LLM（OpenAI 兼容：豆包方舟等）。未配置或占位 Key 时不调用，主题仍为轮换池静态种子。
+# LLM（OpenAI 兼容：豆包方舟等）。未配置或占位 Key 时不调用，主题保持占位内容（由管理员生成写入后生效）。
 MODEL_PROVIDER=doubao
 OPENAI_API_KEY=
 OPENAI_BASE_URL=https://ark.cn-beijing.volces.com/api/v3
