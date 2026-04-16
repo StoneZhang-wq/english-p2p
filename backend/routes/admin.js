@@ -734,7 +734,7 @@ router.post("/themes/:id/generate-preview-by-direction", requireAdmin, async (re
       `INSERT INTO theme_generations (created_by_email, direction, pack_json, pack_version, status)
        VALUES ($1, $2, $3::jsonb, $4, 'preview')
        RETURNING id`,
-      [req.user?.email || null, direction, JSON.stringify(genPackForDb), PROMPT_VERSION || "theme_pack_v3"]
+      [req.user?.email || null, direction, JSON.stringify(genPackForDb), PROMPT_VERSION || "theme_pack_v4"]
     );
 
     res.json({
@@ -744,6 +744,20 @@ router.post("/themes/:id/generate-preview-by-direction", requireAdmin, async (re
         themeId,
         direction,
         generationId: Number(ins.rows?.[0]?.id) || null,
+        // 供写入使用：保持服务端校验形态（snake_case + roles_json + room_tasks_by_role）
+        pack: {
+          name: pack.name,
+          description: pack.description,
+          scene_text: pack.scene_text,
+          roles: JSON.parse(pack.roles_json),
+          preview_markdown: pack.preview_markdown,
+          cover_url: pack.cover_url,
+          difficulty_level: pack.difficulty_level,
+          room_tasks_by_role:
+            pack.room_tasks_payload && typeof pack.room_tasks_payload === "object" && !Array.isArray(pack.room_tasks_payload)
+              ? pack.room_tasks_payload.byRole
+              : undefined,
+        },
         preview: {
           name: pack.name,
           description: pack.description,
@@ -827,7 +841,7 @@ router.post("/themes/:id/commit-generated-pack", requireAdmin, async (req, res) 
         validated.cover_url,
         validated.difficulty_level,
         JSON.stringify(validated.room_tasks_payload),
-        PROMPT_VERSION || "theme_pack_v3",
+        PROMPT_VERSION || "theme_pack_v4",
         themeId,
       ]
     );

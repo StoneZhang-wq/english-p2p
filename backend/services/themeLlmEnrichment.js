@@ -1,13 +1,12 @@
 /**
- * 调用 LLM 生成“主题整包”（场景、角色、预习、room_tasks_json），供管理员预览并写回 themes。
+ * 调用 LLM 生成“主题整包”（极简场景 + 多轮对话任务 + 短预习），供管理员预览并写回 themes。
  * - 批处理：当前仓库已不在 init/周维护中自动执行（以管理员操作为准），但仍保留服务函数供显式调用。
- * - v2：任务 5～7 条规范为 6 条；预习更丰满；用最近 12 个主题摘要做场景去重。
- * - v3：按角色拆分任务集（每角色 6 条），并支持管理员传入 direction（方向）。
+ * - v4：scene_text 一句话；preview_markdown 短预习（含延长技巧）；room_tasks_by_role 每角色恰好 6 条；每条 hints 3-4 句分支；用最近 12 个主题摘要做场景去重。
  */
 
 const { chatCompletionText, isLlmConfigured } = require("./llmChat");
 
-const PROMPT_VERSION = "theme_pack_v3";
+const PROMPT_VERSION = "theme_pack_v4";
 
 /** 去重参考：最近 N 条（非当前批次）主题 */
 const DEDUP_THEME_LIMIT = 12;
@@ -15,10 +14,16 @@ const DEDUP_THEME_LIMIT = 12;
 /** 防止多个 HTTP 请求同时整批刷新同一批活跃主题 */
 var refreshActiveInProgress = false;
 
-const ROOM_TASKS_MIN = 5;
-const ROOM_TASKS_MAX = 7;
+const ROOM_TASKS_MIN = 6;
+const ROOM_TASKS_MAX = 6;
 const ROOM_TASKS_TARGET = 6;
-const PREVIEW_MARKDOWN_MIN_LEN = 600;
+const HINTS_MIN = 3;
+const HINTS_MAX = 4;
+/** 短预习：开口句 + 任务概览 + 延长技巧（中文为主） */
+const PREVIEW_MARKDOWN_MIN_LEN = 80;
+const PREVIEW_MARKDOWN_MAX_LEN = 2000;
+const SCENE_TEXT_MAX_LEN = 220;
+const ROLE_DESC_MAX_LEN = 25;
 
 function safeParseRoles(rolesJson) {
   if (!rolesJson) return [];
@@ -41,14 +46,14 @@ function dedupeTaskIds(tasks) {
 }
 
 /**
- * LLM 允许 5～7 条；落库固定6 条（房间 UI 与接口一致）。
+ * 每角色恰好 6 条任务；每条 hints 3-4 句（房间 UI 与接口一致）。
  * @param {unknown} room_tasks
  * @returns {{ id: string, title: string, hints: string[] }[] | null}
  */
 function normalizeRoomTasksToSix(room_tasks) {
   if (!Array.isArray(room_tasks)) return null;
-  if (room_tasks.length < ROOM_TASKS_MIN || room_tasks.length > ROOM_TASKS_MAX) return null;
-  var tasks = room_tasks.slice(0, ROOM_TASKS_MAX).map(function (t, i) {
+  if (room_tasks.length !== ROOM_TASKS_TARGET) return null;
+  var tasks = room_tasks.map(function (t, i) {
     var id = String(t.id || "t" + (i + 1))
       .replace(/[^\w-]/g, "")
       .slice(0, 32) || "t" + (i + 1);
@@ -61,9 +66,9 @@ function normalizeRoomTasksToSix(room_tasks) {
             return String(h).trim();
           })
           .filter(Boolean)
-          .slice(0, 8)
+          .slice(0, HINTS_MAX)
       : [];
-    if (!title || hints.length < 2) return null;
+    if (!title || hints.length < HINTS_MIN || hints.length > HINTS_MAX) return null;
     return { id: id, title: title, hints: hints };
   });
   if (tasks.some(function (x) {
@@ -71,18 +76,6 @@ function normalizeRoomTasksToSix(room_tasks) {
   }))
     return null;
 
-  if (tasks.length === 7) tasks = tasks.slice(0, ROOM_TASKS_TARGET);
-  if (tasks.length === ROOM_TASKS_TARGET) return dedupeTaskIds(tasks);
-
-  tasks.push({
-    id: "t_supplement",
-    title: "【拓展】用你自己的话承接上一条：补充或追问一点细节",
-    hints: [
-      "Could you say a bit more about that?",
-      "I see — what would you do next in that situation?",
-      "That makes sense. I had a slightly different idea…",
-    ],
-  });
   return dedupeTaskIds(tasks);
 }
 
@@ -107,20 +100,35 @@ function validatePack(obj) {
   var description = String(obj.description || "").trim();
   if (!description || description.length > 2000) return null;
   var scene_text = String(obj.scene_text || "").trim();
-  if (!scene_text || scene_text.length > 4000) return null;
+  if (!scene_text || scene_text.length > SCENE_TEXT_MAX_LEN) return null;
   var roles = obj.roles;
+  if (!roles && obj.roles_json != null) {
+    try {
+      roles = typeof obj.roles_json === "string" ? JSON.parse(obj.roles_json) : obj.roles_json;
+    } catch {
+      roles = null;
+    }
+  }
   if (!Array.isArray(roles) || roles.length < 2) return null;
   roles = roles.slice(0, 2).map(function (r) {
     return {
       label: String(r.label || "ROLE").slice(0, 32),
       name: String(r.name || "").slice(0, 80),
-      desc: String(r.desc || "").slice(0, 400),
+      desc: String(r.desc || "").trim().slice(0, ROLE_DESC_MAX_LEN),
     };
   });
   if (roles.length !== 2 || !roles[0].name || !roles[1].name) return null;
+  if (!roles[0].desc || !roles[1].desc) return null;
   var preview_markdown = String(obj.preview_markdown || "").trim();
-  if (!preview_markdown || preview_markdown.length < PREVIEW_MARKDOWN_MIN_LEN || preview_markdown.length > 32000)
+  if (
+    !preview_markdown ||
+    preview_markdown.length < PREVIEW_MARKDOWN_MIN_LEN ||
+    preview_markdown.length > PREVIEW_MARKDOWN_MAX_LEN
+  )
     return null;
+  if (!/#\s*开口句/.test(preview_markdown)) return null;
+  if (!/#\s*你的6个任务（概览）/.test(preview_markdown)) return null;
+  if (!/#\s*延长对话小贴士/.test(preview_markdown)) return null;
   var cover_url = String(obj.cover_url || "").trim();
   if (!cover_url || !/^https?:\/\//i.test(cover_url)) return null;
 
@@ -129,17 +137,11 @@ function validatePack(obj) {
   });
 
   var roomTasksPayload = null;
-  // v3：按角色拆分任务集
-  if (obj.room_tasks_by_role != null) {
-    var by = normalizeRoomTasksByRoleToSix(obj.room_tasks_by_role, roleNames);
-    if (!by) return null;
-    roomTasksPayload = { version: 3, byRole: by };
-  } else {
-    // v2/v1：单一任务集（仍兼容）
-    var room_tasks = normalizeRoomTasksToSix(obj.room_tasks);
-    if (!room_tasks || room_tasks.length !== ROOM_TASKS_TARGET) return null;
-    roomTasksPayload = room_tasks;
-  }
+  // v3：按角色拆分任务集（本版本强制使用，支撑“每人 6 步、每步多轮”）
+  if (obj.room_tasks_by_role == null) return null;
+  var by = normalizeRoomTasksByRoleToSix(obj.room_tasks_by_role, roleNames);
+  if (!by) return null;
+  roomTasksPayload = { version: 3, byRole: by };
 
   var difficulty_level = ["beginner", "intermediate", "advanced"].includes(String(obj.difficulty_level))
     ? String(obj.difficulty_level)
@@ -248,17 +250,24 @@ async function generateThemePack(seed, options) {
     '  "preview_markdown": string,\n' +
     '  "cover_url": string,\n' +
     '  "difficulty_level": "beginner" | "intermediate" | "advanced",\n' +
-    '  "room_tasks": { "id": string, "title": string, "hints": string[] }[]\n' +
+    '  "room_tasks_by_role": Record<string, { "id": string, "title": string, "hints": string[] }[]>\n' +
     "}\n" +
     "要求：\n" +
-    "- name/description/scene_text 以**中文**为主，适合中国大陆用户；scene_text 为一段沉浸式场景描写（可含氛围与双方关系），避免与【场景去重】列表雷同。\n" +
-    "- roles **恰好 2 条**，与口语对练角色一致；每条 desc 为**总结性说明**（职责/目标/信息差），各不超过约 120 字。\n" +
-    "- preview_markdown 为 **Markdown**，须**丰满**，至少包含这些一级标题（可按 `#标题`）：\n" +
-    "  `# 学习目标` `# 核心词汇` `# 实用句型` `# 情景对话示例` `# 常见误区` `# 自练清单`\n" +
-    "其中「核心词汇」「实用句型」要足够具体；**英文例句**用英文；总长度建议明显长于短文。\n" +
+    "- **极简场景**：scene_text **最多一句话**（中文），只写“谁在做什么/在哪里做什么”，禁止小说式描写（不要时间线、人物背景、氛围渲染、戏剧冲突叙事）。避免与【场景去重】列表雷同。\n" +
+    "- roles **恰好 2 条**；每条 desc **不超过 25 个汉字**（只写职责，不要故事）。\n" +
+    "- preview_markdown：中文为主、**短而可用**（建议总长度 ≤ 400 字），必须包含且仅使用这三个一级标题（必须带 `#`）：\n" +
+    "  `# 开口句` `# 你的6个任务（概览）` `# 延长对话小贴士`\n" +
+    "  - 「开口句」：给两个角色各 1 句可直接开口的英文句子。\n" +
+    "  - 「你的6个任务（概览）」：分别列出两个角色各 6 条任务标题（中文编号 1-6），顺序要能串成自然对话推进。\n" +
+    "  - 「延长对话小贴士」：2-3 条通用技巧（中文），教用户如何多问一句、如何表达偏好/理由、如何复述确认。\n" +
     "- cover_url：必须是可公网访问的 **https** 图片 URL；若不确定可用 Unsplash 与场景相关的图片 URL（模型仍需输出合法 URL；落库时可能保留种子封面）。\n" +
-    "- room_tasks：若不提供 room_tasks_by_role，则输出 **5～7** 条（推荐 6条）。每条 title 为**中文**练习任务；hints 为 **3～5** 条**英文**常用句，口语难度与 difficulty_level 一致；任务之间递进、避免重复问法。\n" +
-    "- room_tasks_by_role（推荐使用）：按角色名拆分任务：{ \"角色名A\": Task[], \"角色名B\": Task[] }；每个数组输出 **5～7** 条，服务端会规范成 6 条落库。\n" +
+    "- **room_tasks_by_role（强制）**：键名必须与 roles[].name **完全一致**；每个角色数组 **恰好 6 条**任务（不要多也不要少）。\n" +
+    "  - 每条任务 title：中文，描述一个可聊 30-60 秒的小目标；任务之间要有信息呼应（例如：报价→推荐→追问→决定→付款→道别）。\n" +
+    "  - 每条任务 hints：**恰好 " +
+    String(HINTS_MIN) +
+    "～" +
+    String(HINTS_MAX) +
+    " 条英文短句**，覆盖不同分支（同意/拒绝/追问/澄清），让用户能自然多轮对话；不要只给一句。\n" +
     "- 在种子基础上**改写增强**，不要逐字复制种子正文。";
 
   var directionBlock = direction
@@ -375,7 +384,7 @@ async function tryEnrichThemesWithLlm(pool) {
 }
 
 /**
- * 将当前**活跃**的非沙箱周主题（通常 3 条）用最新 v2 提示词整包覆盖；**保留**各行现有 cover_url。
+ * 将当前**活跃**的非沙箱周主题（通常 3 条）用最新提示词整包覆盖；**保留**各行现有 cover_url。
  * @param {import("pg").Pool} pool
  */
 async function refreshActiveThemesWithLlm(pool) {

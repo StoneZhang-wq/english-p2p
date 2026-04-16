@@ -467,12 +467,13 @@
             themeId: t.id,
             direction,
             generationId: json && json.data ? (json.data.generationId || null) : null,
-            preview: json && json.data ? json.data.preview : null
+            preview: json && json.data ? json.data.preview : null,
+            pack: json && json.data ? json.data.pack : null
           };
           const previewOut = document.getElementById("outThemePreview" + String(slot));
           if (previewOut) previewOut.textContent = JSON.stringify(window[slotPreviewStateKey(slot)], null, 2);
           const commitBtn = document.getElementById("btnCommit" + String(slot));
-          if (commitBtn) commitBtn.disabled = !(window[slotPreviewStateKey(slot)] && window[slotPreviewStateKey(slot)].preview);
+          if (commitBtn) commitBtn.disabled = !(window[slotPreviewStateKey(slot)] && window[slotPreviewStateKey(slot)].pack);
         } catch (e) {
           out.textContent = "失败：" + (e.message || e);
         }
@@ -481,7 +482,7 @@
       async function commitSlot(slot) {
         const out = document.getElementById("outThemeOps");
         const st = window[slotPreviewStateKey(slot)];
-        if (!st || !st.themeId || !st.preview) {
+        if (!st || !st.themeId || !st.pack) {
           out.textContent = "失败：请先预览生成槽位" + String(slot + 1);
           return;
         }
@@ -490,7 +491,7 @@
           const json = await api("/api/admin/themes/" + encodeURIComponent(String(st.themeId)) + "/commit-generated-pack", {
             method: "POST",
             headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ direction: st.direction, pack: st.preview, generation_id: st.generationId || null }),
+            body: JSON.stringify({ direction: st.direction, pack: st.pack, generation_id: st.generationId || null }),
           });
           out.textContent = JSON.stringify(json, null, 2);
           const commitBtn = document.getElementById("btnCommit" + String(slot));
