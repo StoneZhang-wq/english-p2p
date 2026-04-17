@@ -1,5 +1,5 @@
 /**
- * 开场后：对「已开始且未结束」的场次，为尚未出现在 pairs 中的预约用户做贪心相容配对。
+ * 对「未结束且 status=open」的场次，为尚未出现在 pairs 中的已确认预约用户做贪心配对（同场任意两人即可，按预约 id 顺序两两一组）。
  */
 
 const { findFirstCompatiblePairInBookings } = require("../utils/levelCompatibility");
@@ -47,7 +47,7 @@ async function greedyPairUnmatchedForTimeslot(client, timeslotId) {
 }
 
 /**
- * 扫描所有 open 场次，对「当前时刻 ∈ [start_time, end_time)」（上海 naive）的场次执行一轮贪心配对。
+ * 扫描所有 open 场次，对「当前时刻 < end_time」（上海 naive）的场次执行一轮贪心配对（含开场前已约满两两互配）。
  */
 async function runAutoPairingScan(pool) {
   const { rows } = await pool.query(
@@ -60,10 +60,9 @@ async function runAutoPairingScan(pool) {
 
   const now = Date.now();
   const eligible = rows.filter((r) => {
-    const ts = parseShanghaiNaive(r.start_time);
     const te = parseShanghaiNaive(r.end_time);
-    if (!ts || !te) return false;
-    return now >= ts.getTime() && now < te.getTime();
+    if (!te) return false;
+    return now < te.getTime();
   });
 
   for (const r of eligible) {

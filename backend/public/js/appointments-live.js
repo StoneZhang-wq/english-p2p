@@ -96,11 +96,20 @@
       tagText = "待匹配";
     }
 
-    var partnerLine = b.partnerNickname
-      ? "搭档：" + esc(b.partnerNickname) + (b.partnerCreditScore != null ? "（信用 " + b.partnerCreditScore + "）" : "")
-      : past
-        ? "搭档：—"
-        : "搭档：配对完成后显示";
+    var partnerLabel = "";
+    if (b.partnerNickname) {
+      partnerLabel = esc(b.partnerNickname);
+    } else if (b.partnerUserId != null) {
+      partnerLabel = "用户 #" + esc(b.partnerUserId);
+    }
+    var partnerLine =
+      partnerLabel !== ""
+        ? "语伴：" +
+          partnerLabel +
+          (b.partnerCreditScore != null ? "（信用 " + esc(b.partnerCreditScore) + "）" : "")
+        : past
+          ? "语伴：—"
+          : "语伴：同场匹配完成后显示（可稍候刷新本页）";
 
     var enter = "";
     if (!past && myUid != null && b.timeslotId != null) {

@@ -7,7 +7,7 @@ const router = express.Router();
 
 /**
  * Body: { timeslot_id: number }
- * 调用者须在该场次有已确认预约；与另一名已预约用户等级差≤1 时写入 pairs（并清空该场次旧 pairs）。
+ * 调用者须在该场次有已确认预约；与另一名已预约用户（任意等级）写入 pairs（并清空该场次旧 pairs）。
  */
 router.post("/pair-timeslot", requireAuth, async (req, res) => {
   const timeslotId = Number(req.body?.timeslot_id);
@@ -33,7 +33,7 @@ router.post("/pair-timeslot", requireAuth, async (req, res) => {
       INVALID: [400, "参数无效"],
       NOT_FOUND: [404, "场次不存在"],
       NEED_TWO: [409, "该场次需要至少两名已确认预约的用户"],
-      NO_MATCH: [409, "你在该场次无预约，或没有等级差≤1的另一名预约者可配对"],
+      NO_MATCH: [409, "你在该场次无预约，或该场次没有其他已确认预约用户可配对"],
     };
     const pair = map[e.code];
     if (pair) {
