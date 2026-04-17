@@ -719,13 +719,13 @@ router.post("/themes/:id/generate-preview-by-direction", requireAdmin, async (re
       `SELECT id, name, description, scene_text, roles_json, cover_url, preview_markdown, difficulty_level, theme_slot,
               shanghai_week_monday::text AS week_monday
        FROM themes
-       WHERE id = $1 AND is_active = 1 AND COALESCE(is_sandbox, FALSE) = FALSE AND shanghai_week_monday IS NOT NULL
+       WHERE id = $1
        LIMIT 1`,
       [themeId]
     );
     const row = rows[0];
     if (!row) {
-      return res.status(404).json({ code: 404, message: "主题不存在或非当前上架正式主题", data: null });
+      return res.status(404).json({ code: 404, message: "主题不存在（id 无效）", data: null });
     }
     const recentDedup = await fetchRecentThemeDedupContext(pool, [themeId]);
     const pack = await generateThemePack(
@@ -826,13 +826,13 @@ router.post("/themes/:id/commit-generated-pack", requireAdmin, async (req, res) 
       `SELECT id, cover_url, name, description, scene_text, roles_json, preview_markdown, difficulty_level, theme_slot,
               shanghai_week_monday::text AS week_monday
        FROM themes
-       WHERE id = $1 AND is_active = 1 AND COALESCE(is_sandbox, FALSE) = FALSE AND shanghai_week_monday IS NOT NULL
+       WHERE id = $1
        LIMIT 1`,
       [themeId]
     );
     const row = rows[0];
     if (!row) {
-      return res.status(404).json({ code: 404, message: "主题不存在或非当前上架正式主题", data: null });
+      return res.status(404).json({ code: 404, message: "主题不存在（id 无效）", data: null });
     }
 
     // 将管理员预览的内容（packRaw）做一次服务端校验，再写库；封面以当前行 cover_url 为准。
