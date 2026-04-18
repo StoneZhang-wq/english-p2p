@@ -20,7 +20,7 @@
       .admin-grid { display: grid; grid-template-columns: 1fr; gap: 16px; margin-top: 16px; }
       .hint { color: rgba(15, 23, 42, 0.62); font-size: 13px; margin-top: 6px; line-height: 1.5; }
       table.admin-table { width: 100%; border-collapse: collapse; background: rgba(255,255,255,0.92); border: 1px solid rgba(15, 23, 42, 0.10); border-radius: 14px; overflow: hidden; }
-      .admin-table th, .admin-table td { padding: 10px 10px; border-bottom: 1px solid rgba(15, 23, 42, 0.08); font-size: 13px; text-align: left; color: rgba(15, 23, 42, 0.9); vertical-align: top; }
+      .admin-table th, .admin-table td { padding: 10px 10px; border-bottom: 1px solid rgba(15, 23, 42, 0.08); font-size: 13px; text-align: left; color: rgba(15, 23, 42, 0.9); vertical-align: top; word-break: break-word; }
       .admin-table th { font-size: 12px; letter-spacing: 0.06em; text-transform: uppercase; color: rgba(15, 23, 42, 0.62); background: rgba(15, 23, 42, 0.02); }
       .admin-kpi { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 10px; margin-top: 10px; }
       .admin-kpi .k { background: rgba(255,255,255,0.92); border: 1px solid rgba(15, 23, 42, 0.10); border-radius: 14px; padding: 10px 12px; }
@@ -96,7 +96,7 @@
             <div class="room-tasks-head">
               <h3 class="room-tasks-heading">场次列表</h3>
             </div>
-            <div class="hint">默认仅拉取「当前范围」内场次；可填 theme_id 限定主题。拉取后可在「预约与配对」页用下拉框选场次。</div>
+            <div class="hint">默认仅拉取「当前范围」内场次；可填 theme_id 限定主题。表格含<strong>预约用户昵称</strong>与<strong>配对人昵称</strong>（多条用顿号或分号分隔）。拉取后可在「预约与配对」页用下拉框选场次。</div>
             <div class="admin-row">
               <label>
                 theme_id（可选）
@@ -346,6 +346,26 @@
             <div id="outSlotDetail" class="hint">（等待操作）</div>
             <div id="outBookingsTable" style="margin-top: 10px"></div>
             <div id="outPairsTable" style="margin-top: 10px"></div>
+            <section class="room-tasks-panel" style="margin-top: 16px">
+              <div class="room-tasks-head">
+                <h3 class="room-tasks-heading">迁移预约（跨主题 / 合并同钟点）</h3>
+              </div>
+              <div class="hint">
+                将某条 <code>booking</code> 改到<strong>另一</strong> <code>timeslot_id</code>（含不同主题同时间）。会删除该用户在<strong>原场次</strong>上的 <code>pairs</code>，并校正两侧 <code>booked_count</code>。目标场次须 <code>open</code> 且未满员；<strong>不受</strong>用户侧「距开场 60 分钟停新约」限制。迁移后请通知用户用<strong>新场次 ID</strong>从「我的预约」进房或刷新列表。
+              </div>
+              <div class="admin-row">
+                <label>
+                  booking_id
+                  <input id="moveBookingId" placeholder="从上方 bookings 表复制" inputmode="numeric" />
+                </label>
+                <label>
+                  目标 timeslot_id
+                  <input id="moveTargetTimeslotId" placeholder="对方所在场次 ID" inputmode="numeric" />
+                </label>
+                <button type="button" id="btnMoveBooking">执行迁移</button>
+              </div>
+              <pre id="outBookingMove" class="admin-pre-out">（等待操作）</pre>
+            </section>
           </section>
         </div>
 
@@ -452,6 +472,7 @@
           const msg = json && json.message ? json.message : "HTTP " + res.status;
           const err = new Error(msg);
           if (json && json.data && Array.isArray(json.data.errors)) err.validationErrors = json.data.errors;
+          if (json && json.data && json.data.llmDebug) err.llmDebug = json.data.llmDebug;
           throw err;
         }
         return json;
@@ -1081,7 +1102,28 @@
           const commitBtn = document.getElementById("btnCommit" + String(slot));
           if (commitBtn) commitBtn.disabled = !(window[slotPreviewStateKey(slot)] && window[slotPreviewStateKey(slot)].pack);
         } catch (e) {
-          out.textContent = "失败：" + (e.message || e);
+          var lines = ["失败：" + (e.message || e)];
+          if (e.validationErrors && e.validationErrors.length) {
+            lines.push("校验项：\n- " + e.validationErrors.join("\n- "));
+          }
+          if (e.llmDebug) {
+            lines.push(
+              "—— LLM 调试（parseStage=" +
+                String(e.llmDebug.parseStage || "") +
+                (e.llmDebug.truncated ? "，原文已截断" : "") +
+                "）——"
+            );
+            lines.push(JSON.stringify(e.llmDebug, null, 2));
+          }
+          out.textContent = lines.join("\n\n");
+          const previewOut = document.getElementById("outThemePreview" + String(slot));
+          if (previewOut) {
+            previewOut.textContent = e.llmDebug
+              ? JSON.stringify(e.llmDebug, null, 2)
+              : "（本次无 LLM 原始调试负载；若为网络/鉴权错误，请见上方）";
+          }
+          const commitBtn = document.getElementById("btnCommit" + String(slot));
+          if (commitBtn) commitBtn.disabled = true;
         }
       }
 
@@ -1141,6 +1183,9 @@
         try {
           const json = await api("/api/admin/timeslots" + qs);
           const rows = (json && json.data && Array.isArray(json.data.timeslots)) ? json.data.timeslots : [];
+          function slotNames(s) {
+            return s && String(s).trim() ? String(s) : "（无）";
+          }
           renderTable(out, [
             { h: "id", v: (r) => r.id },
             { h: "theme", v: (r) => r.themeName },
@@ -1149,6 +1194,8 @@
             { h: "booked", v: (r) => r.bookedCount + " / " + (r.maxPairs * 2) },
             { h: "confirmed", v: (r) => r.bookingConfirmedCount },
             { h: "pairs", v: (r) => r.pairCount },
+            { h: "预约用户", v: (r) => slotNames(r.bookingNicknames) },
+            { h: "配对", v: (r) => slotNames(r.pairNicknames) },
           ], rows);
           window.__adminTimeslotsRows = rows;
           fillTimeslotSelect(rows);
@@ -1264,6 +1311,27 @@
         } catch (e) {
           out.textContent = "失败：" + (e.message || e);
           if (outRaw) outRaw.textContent = "";
+        }
+      });
+
+      document.getElementById("btnMoveBooking").addEventListener("click", async function () {
+        const out = document.getElementById("outBookingMove");
+        const bid = Number(val("moveBookingId"));
+        const targetTid = Number(val("moveTargetTimeslotId"));
+        if (!bid || Number.isNaN(bid) || !targetTid || Number.isNaN(targetTid)) {
+          out.textContent = "请填写有效的 booking_id 与目标 timeslot_id";
+          return;
+        }
+        out.textContent = "提交中…";
+        try {
+          const json = await api("/api/admin/bookings/move", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ booking_id: bid, target_timeslot_id: targetTid }),
+          });
+          out.textContent = JSON.stringify(json, null, 2);
+        } catch (e) {
+          out.textContent = "失败：" + (e.message || e);
         }
       });
 

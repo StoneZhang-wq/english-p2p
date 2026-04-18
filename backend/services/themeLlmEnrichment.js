@@ -33,6 +33,39 @@ const PREVIEW_MARKDOWN_MAX_LEN = 1200;
 const SCENE_TEXT_MAX_LEN = 220;
 const ROLE_DESC_MAX_LEN = 25;
 
+/** 预览失败时随响应返回的 LLM 原文上限（字符），避免响应体过大 */
+const LLM_DEBUG_RAW_MAX = 250000;
+
+/**
+ * @param {string} text
+ * @param {unknown} parsedJson
+ * @param {string[]} validationErrors
+ * @param {string} parseStage
+ */
+function buildLlmDebug(text, parsedJson, validationErrors, parseStage) {
+  var t = text == null ? "" : String(text);
+  var truncated = t.length > LLM_DEBUG_RAW_MAX;
+  var rawText = truncated ? t.slice(0, LLM_DEBUG_RAW_MAX) + "\n\n…（已截断，原始约 " + t.length + " 字符）" : t;
+  return {
+    rawText: rawText,
+    parsedJson: parsedJson != null ? parsedJson : null,
+    validationErrors: Array.isArray(validationErrors) ? validationErrors : [],
+    parseStage: parseStage || "",
+    truncated: truncated,
+  };
+}
+
+/**
+ * @param {string} message
+ * @param {ReturnType<typeof buildLlmDebug>} debug
+ */
+function throwThemeGenerateError(message, debug) {
+  var e = new Error(message);
+  e.code = "THEME_PACK_GENERATE_FAILED";
+  e.llmDebug = debug;
+  throw e;
+}
+
 function safeParseRoles(rolesJson) {
   if (!rolesJson) return [];
   try {
@@ -455,22 +488,34 @@ async function generateThemePack(seed, options) {
   } catch (eParse) {
     var m = text.match(/\{[\s\S]*\}/);
     if (!m) {
-      throw new Error(
+      throwThemeGenerateError(
         "LLM 输出无法解析为 JSON（可能被截断或非 JSON）。请重试；若仍失败请在 .env 设置 OPENAI_THEME_MAX_TOKENS=12288 或更高。原始错误：" +
-          (eParse && eParse.message ? eParse.message : String(eParse))
+          (eParse && eParse.message ? eParse.message : String(eParse)),
+        buildLlmDebug(text, null, [], "json_parse_no_brace")
       );
     }
     try {
       parsed = JSON.parse(m[0]);
     } catch (e2) {
-      throw new Error(
-        "LLM JSON 不完整或非法，请重试或增大 OPENAI_THEME_MAX_TOKENS。详情：" + (e2 && e2.message ? e2.message : String(e2))
+      throwThemeGenerateError(
+        "LLM JSON 不完整或非法，请重试或增大 OPENAI_THEME_MAX_TOKENS。详情：" + (e2 && e2.message ? e2.message : String(e2)),
+        buildLlmDebug(text, null, [], "json_parse_extract")
       );
     }
   }
 
-  var pack = validatePack(parsed);
-  if (!pack) throw new Error("LLM JSON 未通过校验");
+  var detailed = validatePackDetailed(parsed);
+  if (!detailed.ok || !detailed.normalizedPack) {
+    var hint =
+      detailed.errors && detailed.errors.length
+        ? detailed.errors.join("；")
+        : "结构校验未通过";
+    throwThemeGenerateError(
+      "LLM JSON 未通过校验：" + hint,
+      buildLlmDebug(text, parsed, detailed.errors || [], "validate")
+    );
+  }
+  var pack = detailed.normalizedPack;
   applySeedCoverUrl(pack, seed);
   return pack;
 }

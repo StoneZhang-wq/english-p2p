@@ -174,11 +174,12 @@ CREATE TABLE credit_logs (
 
 | 方法 | 路径 | 说明 |
 |------|------|------|
-| GET | `/api/admin/timeslots` | Query：可选 `theme_id`；返回场次列表（含预约数、pairs 数） |
+| GET | `/api/admin/timeslots` | Query：可选 `theme_id`、`recent=1`（默认后台勾选）。返回场次列表（含 `booked_count` / `max_pairs`、confirmed 数、pairs 数；另含 **`bookingNicknames`**：该场所有已确认预约用户昵称（`、` 拼接）、**`pairNicknames`**：各 pair 双方昵称（`甲×乙` 多对用 `；` 拼接），供 `admin.html` 场次列表直接展示） |
 | GET | `/api/admin/timeslots/:id/bookings` | 返回该场次 `confirmed` 预约用户（含 email/nickname/level） |
 | GET | `/api/admin/timeslots/:id/pairs` | 返回该场次 pairs 列表 |
 | POST | `/api/admin/timeslots/:id/pair` | Body：`{ user_a, user_b, force? }`；两人须均已预约该场次；`force=true` 时会先清掉该场次中涉及任一人的旧 pairs；随后插入一条新 pairs（频道名 `admin_eng_...`） |
 | POST | `/api/admin/timeslots/:id/unpair` | Body：`{ pair_id }`；删除该场次指定 pairs |
+| POST | `/api/admin/bookings/move` | Body：`{ booking_id, target_timeslot_id }`。将一条 `confirmed` 预约改到另一场次（跨主题同钟点合并）；事务内删该用户在原场次的 `pairs`，校正两侧 `booked_count`；目标须 `open` 且未满员；**不套用**用户侧距开场 60 分钟停新约（见 `services/adminMoveBooking.js`） |
 | GET | `/api/admin/themes/active` | 当前 `is_active` 的正式周主题**至多 3 条**（含 id、槽位、周、LLM 版本摘要） |
 | GET | `/api/admin/themes/active-full` | 当前上架 3 个正式主题的**完整内容**（场景、角色、预习、room_tasks_json 等） |
 | GET | `/api/admin/stats` | 注册总数、今日新增、近7日新增；主题总数、上架主题数等 |
@@ -190,7 +191,7 @@ CREATE TABLE credit_logs (
 | GET | `/api/admin/generations/history-preview` | Query：`retention_days`（1～365，默认30）。预览将删除多少条生成记录（不执行删除）。 |
 | POST | `/api/admin/generations/history-delete` | Body：`{ retention_days, confirm:true }`。硬删除早于保留期的生成记录（不影响已写入主题）。 |
 | POST | `/api/admin/themes/validate-pack` | Body：`{ pack }`。仅校验主题整包（与写入同一套 `validatePack` 规则），返回 `data.ok` 与 `data.errors`（可读中文列表），**不写库**。供 `admin.html`「手动编辑」区在提交前自检。 |
-| POST | `/api/admin/themes/:id/generate-preview-by-direction` | Body：`{ direction }`（字符串）。**须 `ADMIN_EMAILS`**。以 `themes.id` 对应行为种子生成整包预览（不要求已上架/非沙箱）；写入 `theme_generations` 留痕（status=`preview`），返回 `generationId` + 场景/角色/预习/任务等 JSON。 |
+| POST | `/api/admin/themes/:id/generate-preview-by-direction` | Body：`{ direction }`（字符串）。**须 `ADMIN_EMAILS`**。以 `themes.id` 对应行为种子生成整包预览（不要求已上架/非沙箱）；写入 `theme_generations` 留痕（status=`preview`），返回 `generationId` + 场景/角色/预习/任务等 JSON。**失败**：JSON 解析失败或整包校验失败时 **HTTP 422**，`data.llmDebug`：`rawText`（服务端有最大字符数截断）、`parsedJson`、`validationErrors`、`parseStage`、`truncated`；`LLM_NOT_CONFIGURED` 仍为 503。 |
 | POST | `/api/admin/themes/:id/commit-generated-pack` | Body：`{ direction, pack, generation_id? }`。**须 `ADMIN_EMAILS`**。将预览或**管理员手填** `pack` 通过服务端校验后**写入 themes**（默认保留当前行 `cover_url`）；目标行仅需 `themes.id` 存在（不要求 `is_active`、不要求 `shanghai_week_monday`、允许沙箱行）。若带 `generation_id`，会将对应生成记录标记为 `applied`。校验失败时响应 `data.errors` 列表。 |
 | POST | `/api/admin/themes/llm-refresh-active` | 无 Body。与 `POST /api/dev/theme-llm-refresh-active` 同逻辑，**须 `ADMIN_EMAILS`**，**生产可用**；并发第二次返回 **409**（`REFRESH_IN_PROGRESS`） |
 

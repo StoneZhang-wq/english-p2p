@@ -12,6 +12,7 @@ const {
 } = require("../services/themeLlmEnrichment");
 
 const router = express.Router();
+const { adminMoveBooking } = require("../services/adminMoveBooking");
 
 function makeChannelName(timeslotId, userA, userB) {
   return `admin_eng_${timeslotId}_${userA}_${userB}_${Date.now()}`;
@@ -75,7 +76,20 @@ router.get("/timeslots", requireAdmin, async (req, res) => {
               t.max_pairs,
               th.name AS theme_name,
               (SELECT COUNT(*)::int FROM bookings b WHERE b.timeslot_id = t.id AND b.status = 'confirmed') AS booking_confirmed_count,
-              (SELECT COUNT(*)::int FROM pairs p WHERE p.timeslot_id = t.id) AS pair_count
+              (SELECT COUNT(*)::int FROM pairs p WHERE p.timeslot_id = t.id) AS pair_count,
+              (SELECT string_agg(COALESCE(u.nickname, '用户#' || b.user_id::text), '、' ORDER BY b.id)
+                 FROM bookings b
+                 JOIN users u ON u.id = b.user_id
+                 WHERE b.timeslot_id = t.id AND b.status = 'confirmed'
+              ) AS booking_nicknames,
+              (SELECT string_agg(
+                        COALESCE(ua.nickname, '用户#' || p.user_a::text) || '×' || COALESCE(ub.nickname, '用户#' || p.user_b::text),
+                        '；' ORDER BY p.id)
+                 FROM pairs p
+                 LEFT JOIN users ua ON ua.id = p.user_a
+                 LEFT JOIN users ub ON ub.id = p.user_b
+                 WHERE p.timeslot_id = t.id
+              ) AS pair_nicknames
        FROM timeslots t
        JOIN themes th ON th.id = t.theme_id
        WHERE ($1::int IS NULL OR t.theme_id = $1::int)
@@ -95,6 +109,8 @@ router.get("/timeslots", requireAdmin, async (req, res) => {
       maxPairs: r.max_pairs,
       bookingConfirmedCount: r.booking_confirmed_count,
       pairCount: r.pair_count,
+      bookingNicknames: r.booking_nicknames || "",
+      pairNicknames: r.pair_nicknames || "",
     })) } });
   } catch (e) {
     console.error("[admin] GET timeslots", e);
@@ -581,6 +597,38 @@ router.post("/timeslots/:id/pair", requireAdmin, async (req, res) => {
   }
 });
 
+// POST /api/admin/bookings/move  Body: { booking_id, target_timeslot_id }
+router.post("/bookings/move", requireAdmin, async (req, res) => {
+  const bookingId = Number(req.body?.booking_id);
+  const targetTimeslotId = Number(req.body?.target_timeslot_id);
+  if (!bookingId || Number.isNaN(bookingId) || !targetTimeslotId || Number.isNaN(targetTimeslotId)) {
+    return res.status(400).json({ code: 400, message: "参数无效（booking_id / target_timeslot_id）", data: null });
+  }
+  try {
+    const pool = getPool();
+    const data = await adminMoveBooking(pool, bookingId, targetTimeslotId);
+    res.json({ code: 0, message: "ok", data });
+  } catch (e) {
+    const map = {
+      INVALID: [400, e.message],
+      NOT_FOUND: [404, e.message],
+      BAD_STATE: [409, e.message],
+      SAME_SLOT: [409, e.message],
+      SLOT_NOT_FOUND: [404, e.message],
+      TARGET_CLOSED: [409, e.message],
+      TARGET_FULL: [409, e.message],
+      DUP_TARGET: [409, e.message],
+      CONFLICT: [409, e.message],
+    };
+    const pair = map[e.code];
+    if (pair) {
+      return res.status(pair[0]).json({ code: pair[0], message: pair[1], data: null });
+    }
+    console.error("[admin] POST bookings/move", e);
+    res.status(500).json({ code: 500, message: e && e.message ? e.message : "服务器错误", data: null });
+  }
+});
+
 // —— 周主题：LLM 刷新 / 按方向生成（仅 ADMIN_EMAILS） ——
 
 // GET /api/admin/themes/active
@@ -797,8 +845,16 @@ router.post("/themes/:id/generate-preview-by-direction", requireAdmin, async (re
     if (code === "LLM_NOT_CONFIGURED") {
       return res.status(503).json({ code: 503, message: e.message, data: null });
     }
+    const dbg = e && e.llmDebug;
     console.error("[admin] POST themes/generate-preview-by-direction", e);
     const msg = e && e.message ? e.message : "服务器错误";
+    if (dbg) {
+      return res.status(422).json({
+        code: 422,
+        message: msg,
+        data: { llmDebug: dbg },
+      });
+    }
     return res.status(500).json({ code: 500, message: msg, data: null });
   }
 });
