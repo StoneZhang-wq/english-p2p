@@ -201,7 +201,7 @@ CREATE TABLE credit_logs (
 |------|------|------|
 | POST | `/api/dev/pair-timeslot` | Body：`{ timeslot_id }`（整数）。**须登录**；调用者须在该场次有 `confirmed` 预约，且存在**另一名**同场次预约者（**不区分等级**）；事务内 **删除该场次全部 `pairs`** 后 **INSERT** 一行（`channel_name` 形如 `dev_eng_{timeslotId}_{ts}`）。**禁止**在生产长期开启 `ENABLE_DEV_PAIRING`。 |
 | POST | `/api/dev/theme-llm-rerun` | Body：`{ theme_id }`（整数）。**须登录**；清空该主题 `llm_generated_at` / `room_tasks_json` / `llm_prompt_version` 并**立即**调用 LLM 写回（**消耗额度**）。写回后默认**保留**该行既有 `cover_url`。仅**非沙箱**且 `shanghai_week_monday` 非空之主题；与 `pair-timeslot` 同开关（`NODE_ENV` 非 production 或 `ENABLE_DEV_PAIRING=1`）。 |
-| POST | `/api/dev/theme-llm-refresh-active` | **须登录**，无 Body。对当前 `is_active=1` 的**至多 3 条**非沙箱周主题**顺序**调用 LLM 整包覆盖（`theme_pack_v5`：极简一句 `scene_text`；课程化预习 `preview_markdown`（约 **300～1200** 字；`## 核心词汇`/`## 角色句型` 须在 `# 开口句` 前；其后三个 `#` 节）；`room_tasks_by_role` 每角色 **6** 条任务且每条 **3-4** 条分支 hints；注入**最近 12 个主题**场景摘要做去重参考）；**保留**各行 `cover_url`。与 `pair-timeslot` 同开关。 |
+| POST | `/api/dev/theme-llm-refresh-active` | **须登录**，无 Body。对当前 `is_active=1` 的**至多 3 条**非沙箱周主题**顺序**调用 LLM 整包覆盖（`theme_pack_v5`：极简一句 `scene_text`；课程化预习 `preview_markdown`（约 **300～3000** 字；`## 核心词汇`/`## 角色句型` 须在 `# 开口句` 前；其后三个 `#` 节）；`room_tasks_by_role` 每角色 **6** 条任务且每条 **3-4** 条分支 hints；注入**最近 12 个主题**场景摘要做去重参考）；**保留**各行 `cover_url`。与 `pair-timeslot` 同开关。 |
 
 **沙箱实验室（见第 6.7 节）**：**已实现** — `GET /api/dev/sandbox-lab`、`POST /api/dev/sandbox-slot/refresh`（须登录；仅非生产或 `ENABLE_SANDBOX_LAB=1`）；`public/dev-lab.html`；`themes.is_sandbox`、`services/sandboxLab.js`、`initDb` 内 `ensureSandboxLab`。
 

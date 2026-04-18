@@ -29,7 +29,7 @@ const HINTS_MIN = 3;
 const HINTS_MAX = 4;
 /** 预习：核心词汇 + 角色句型 + 三个一级标题（见 tryValidatePack） */
 const PREVIEW_MARKDOWN_MIN_LEN = 300;
-const PREVIEW_MARKDOWN_MAX_LEN = 1200;
+const PREVIEW_MARKDOWN_MAX_LEN = 3000;
 const SCENE_TEXT_MAX_LEN = 220;
 const ROLE_DESC_MAX_LEN = 25;
 

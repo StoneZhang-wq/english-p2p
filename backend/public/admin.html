@@ -196,7 +196,7 @@
             <div style="margin-top: 10px">
               <div class="hint">
                 当 LLM 配额或输出不稳定时，可在此<strong>按表单填写</strong>整包内容并写入数据库。规则与 AI 生成一致（<code>theme_pack_v5</code>）：
-                预习须含 <code>## 核心词汇</code>、<code>## 角色句型</code>（均在 <code># 开口句</code> 之前），再加三个一级标题；总长度 <strong>300～1200</strong> 字；两角色每人 <strong>6 条</strong>任务、每条 <strong>3～4 句</strong>英文提示。
+                预习须含 <code>## 核心词汇</code>、<code>## 角色句型</code>（均在 <code># 开口句</code> 之前），再加三个一级标题；总长度 <strong>300～3000</strong> 字；两角色每人 <strong>6 条</strong>任务、每条 <strong>3～4 句</strong>英文提示。
               </div>
               <ol class="manual-ol">
                 <li>选择<strong>槽位 1～3</strong>，点<strong>从服务器载入该槽当前主题</strong>把已有内容填进表单（可再改）。</li>
@@ -307,10 +307,10 @@
           <fieldset class="manual-theme-fieldset">
             <legend>预习 Markdown（theme_pack_v5）</legend>
             <div class="hint">
-              须含 <code>## 核心词汇</code>、<code>## 角色句型</code>（均在 <code># 开口句</code> 前），再含 <code># 开口句</code>、<code># 你的6个任务（概览）</code>、<code># 延长对话小贴士</code>；总长度 <strong>300～1200</strong> 字。可点「插入预习完整模板」后替换「角色甲/乙」为你的角色名并扩写词汇区。
+              须含 <code>## 核心词汇</code>、<code>## 角色句型</code>（均在 <code># 开口句</code> 前），再含 <code># 开口句</code>、<code># 你的6个任务（概览）</code>、<code># 延长对话小贴士</code>；总长度 <strong>300～3000</strong> 字。可点「插入预习完整模板」后替换「角色甲/乙」为你的角色名并扩写词汇区。
             </div>
-            <textarea id="mt_preview" rows="18" maxlength="1200" placeholder="点击「插入预习完整模板」开始"></textarea>
-            <div id="mt_preview_len" style="margin-top: 6px">当前字数：0 / 1200</div>
+            <textarea id="mt_preview" rows="18" maxlength="3000" placeholder="点击「插入预习完整模板」开始"></textarea>
+            <div id="mt_preview_len" style="margin-top: 6px">当前字数：0 / 3000</div>
           </fieldset>
 
           <pre id="outManualTheme">（手动主题：校验或写入结果将显示在这里）</pre>
@@ -459,6 +459,9 @@
     </div>
 
     <script>
+      var THEME_PREVIEW_MD_MIN = 300;
+      var THEME_PREVIEW_MD_MAX = 3000;
+
       async function api(path, options) {
         const res = await fetch(path, Object.assign({ credentials: "include" }, options || {}));
         const txt = await res.text();
@@ -742,8 +745,8 @@
         var el = document.getElementById("mt_preview_len");
         if (!ta || !el) return;
         var n = (ta.value || "").length;
-        el.textContent = "当前字数：" + n + " / 1200（建议 300～1200）";
-        el.style.color = n > 0 && (n < 300 || n > 1200) ? "#b45309" : "rgba(15,23,42,0.55)";
+        el.textContent = "当前字数：" + n + " / " + THEME_PREVIEW_MD_MAX + "（建议 " + THEME_PREVIEW_MD_MIN + "～" + THEME_PREVIEW_MD_MAX + "）";
+        el.style.color = n > 0 && (n < THEME_PREVIEW_MD_MIN || n > THEME_PREVIEW_MD_MAX) ? "#b45309" : "rgba(15,23,42,0.55)";
       }
       var mtp = document.getElementById("mt_preview");
       if (mtp) {
