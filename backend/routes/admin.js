@@ -757,7 +757,7 @@ router.post("/themes/:id/generate-preview-by-direction", requireAdmin, async (re
       `INSERT INTO theme_generations (created_by_email, direction, pack_json, pack_version, status)
        VALUES ($1, $2, $3::jsonb, $4, 'preview')
        RETURNING id`,
-      [req.user?.email || null, direction, JSON.stringify(genPackForDb), PROMPT_VERSION || "theme_pack_v4"]
+      [req.user?.email || null, direction, JSON.stringify(genPackForDb), PROMPT_VERSION || "theme_pack_v5"]
     );
 
     res.json({
@@ -869,7 +869,7 @@ router.post("/themes/:id/commit-generated-pack", requireAdmin, async (req, res) 
         validated.cover_url,
         validated.difficulty_level,
         JSON.stringify(validated.room_tasks_payload),
-        PROMPT_VERSION || "theme_pack_v4",
+        PROMPT_VERSION || "theme_pack_v5",
         themeId,
       ]
     );

@@ -1213,6 +1213,13 @@ img {
   max-width: 65%;
 }
 
+.room-top-meta {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 4px;
+}
+
 .room-timer {
   padding: 6px 12px;
   border-radius: 999px;
@@ -1220,6 +1227,19 @@ img {
   color: rgba(26, 92, 255, 0.95);
   font-size: 0.875rem;
   font-variant-numeric: tabular-nums;
+  font-weight: 600;
+}
+
+.room-pair-limit {
+  font-size: 0.75rem;
+  color: rgba(15, 23, 42, 0.62);
+  max-width: 240px;
+  text-align: right;
+  line-height: 1.35;
+}
+
+.room-pair-limit--warn {
+  color: #b45309;
   font-weight: 600;
 }
 

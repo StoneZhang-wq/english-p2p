@@ -1,12 +1,12 @@
 /**
  * 调用 LLM 生成“主题整包”（极简场景 + 多轮对话任务 + 短预习），供管理员预览并写回 themes。
  * - 批处理：当前仓库已不在 init/周维护中自动执行（以管理员操作为准），但仍保留服务函数供显式调用。
- * - v4：scene_text 一句话；preview_markdown 短预习（含延长技巧）；room_tasks_by_role 每角色恰好 6 条；每条 hints 3-4 句分支；用最近 12 个主题摘要做场景去重。
+ * - v5：scene_text 一句话；preview_markdown 含「核心词汇」「角色句型」二级块 + 三个一级标题；room_tasks_by_role 每角色恰好 6 条；每条 hints 3-4 句；用最近 12 个主题摘要做场景去重。
  */
 
 const { chatCompletionText, isLlmConfigured } = require("./llmChat");
 
-const PROMPT_VERSION = "theme_pack_v4";
+const PROMPT_VERSION = "theme_pack_v5";
 
 /** 主题整包 JSON 较长，须显式提高 completion 上限，避免默认 max_tokens 截断导致 JSON.parse 失败 */
 function themeLlmMaxTokens() {
@@ -27,9 +27,9 @@ const ROOM_TASKS_MAX = 6;
 const ROOM_TASKS_TARGET = 6;
 const HINTS_MIN = 3;
 const HINTS_MAX = 4;
-/** 短预习：开口句 + 任务概览 + 延长技巧（中文为主） */
-const PREVIEW_MARKDOWN_MIN_LEN = 80;
-const PREVIEW_MARKDOWN_MAX_LEN = 2000;
+/** 预习：核心词汇 + 角色句型 + 三个一级标题（见 tryValidatePack） */
+const PREVIEW_MARKDOWN_MIN_LEN = 300;
+const PREVIEW_MARKDOWN_MAX_LEN = 1200;
 const SCENE_TEXT_MAX_LEN = 220;
 const ROLE_DESC_MAX_LEN = 25;
 
@@ -161,11 +161,28 @@ function tryValidatePack(obj) {
   else {
     if (preview_markdown.length < PREVIEW_MARKDOWN_MIN_LEN) {
       errors.push(
-        "「预习」过短（至少 " + String(PREVIEW_MARKDOWN_MIN_LEN) + " 字），请写满「开口句 + 6 任务概览 + 延长技巧」"
+        "「预习」过短（至少 " +
+          String(PREVIEW_MARKDOWN_MIN_LEN) +
+          " 字），须含「## 核心词汇」「## 角色句型」及三个一级标题（见管理员模板）"
       );
     }
     if (preview_markdown.length > PREVIEW_MARKDOWN_MAX_LEN) {
       errors.push("「预习」不能超过 " + String(PREVIEW_MARKDOWN_MAX_LEN) + " 字");
+    }
+    if (!/##\s*核心词汇/.test(preview_markdown)) {
+      errors.push("预习中必须包含二级标题：`## 核心词汇`（## 与文字之间可有空格）");
+    }
+    if (!/##\s*角色句型/.test(preview_markdown)) {
+      errors.push("预习中必须包含二级标题：`## 角色句型`");
+    }
+    var idxOpen = preview_markdown.search(/#\s*开口句/);
+    var idxVocab = preview_markdown.search(/##\s*核心词汇/);
+    var idxPhrase = preview_markdown.search(/##\s*角色句型/);
+    if (idxOpen >= 0 && idxVocab >= 0 && idxVocab > idxOpen) {
+      errors.push("「## 核心词汇」须出现在「# 开口句」**之前**");
+    }
+    if (idxOpen >= 0 && idxPhrase >= 0 && idxPhrase > idxOpen) {
+      errors.push("「## 角色句型」须出现在「# 开口句」**之前**");
     }
     if (!/#\s*开口句/.test(preview_markdown)) errors.push("预习中必须包含一级标题：`# 开口句`（# 与文字之间可有空格）");
     if (!/#\s*你的6个任务（概览）/.test(preview_markdown)) {
@@ -369,7 +386,7 @@ async function generateThemePack(seed, options) {
     dedupBlock =
       "\n\n【场景去重 — 必读】以下 JSON 为**最近已上线主题池中至多 " +
       DEDUP_THEME_LIMIT +
-      " 个**主题的场景摘要（不含当前正生成的主题）。你必须避免**撞场景**：不得使用与下列在「地点/场合/职业组合/核心矛盾」上高度雷同的设定；禁止换皮复述（例如已出现「咖啡馆排队」则不可再做「咖啡店等餐」类同构场景）。请选一个**新鲜**的口语情境。\n" +
+      " 个**主题的场景摘要（不含当前正生成的主题）。你必须避免**撞场景**：不得使用与下列在「地点/场合/职业组合/核心互动」上高度雷同的设定；禁止换皮复述（例如已出现「咖啡馆排队」则不可再做「咖啡店等餐」类同构场景）。请选一个**新鲜**的口语情境。\n" +
       JSON.stringify(recentDedup, null, 2);
   }
 
@@ -384,25 +401,34 @@ async function generateThemePack(seed, options) {
     '  "preview_markdown": string,\n' +
     '  "cover_url": string,\n' +
     '  "difficulty_level": "beginner" | "intermediate" | "advanced",\n' +
-    '  "room_tasks_by_role": Record<string, { "id": string, "title": string, "hints": string[] }[]>\n' +
+    '  "room_tasks_by_role": Record<string, { "id"?: string, "title": string, "hints": string[] }[]>\n' +
     "}\n" +
-    "要求：\n" +
-    "- **极简场景**：scene_text **最多一句话**（中文），只写“谁在做什么/在哪里做什么”，禁止小说式描写（不要时间线、人物背景、氛围渲染、戏剧冲突叙事）。避免与【场景去重】列表雷同。\n" +
-    "- roles **恰好 2 条**；每条 desc **不超过 25 个汉字**（只写职责，不要故事）。\n" +
-    "- preview_markdown：中文为主、**短而可用**（建议总长度 ≤ 400 字），必须包含且仅使用这三个一级标题（必须带 `#`）：\n" +
-    "  `# 开口句` `# 你的6个任务（概览）` `# 延长对话小贴士`\n" +
-    "  - 「开口句」：给两个角色各 1 句可直接开口的英文句子。\n" +
-    "  - 「你的6个任务（概览）」：分别列出两个角色各 6 条任务标题（中文编号 1-6），顺序要能串成自然对话推进。\n" +
-    "  - 「延长对话小贴士」：2-3 条通用技巧（中文），教用户如何多问一句、如何表达偏好/理由、如何复述确认。\n" +
-    "- cover_url：必须是可公网访问的 **https** 图片 URL；若不确定可用 Unsplash 与场景相关的图片 URL（模型仍需输出合法 URL；落库时可能保留种子封面）。\n" +
-    "- **room_tasks_by_role（强制）**：键名必须与 roles[].name **完全一致**；每个角色数组 **恰好 6 条**任务（不要多也不要少）。\n" +
-    "  - 每条任务 title：中文，描述一个可聊 30-60 秒的小目标；任务之间要有信息呼应（例如：报价→推荐→追问→决定→付款→道别）。\n" +
-    "  - 每条任务 hints：**恰好 " +
-    String(HINTS_MIN) +
+    "字段与风格要求：\n" +
+    "- name：中文主题标题，建议 **≤20 字**。\n" +
+    "- description：一句话简介，建议 **≤50 字**。\n" +
+    "- scene_text：**恰好一句**中文场景（建议 ≤50 字），只写「谁在做什么」，禁止时间线、人物小传、矛盾冲突、秘密目标等剧情化描写。避免与【场景去重】列表雷同。\n" +
+    "- roles：**恰好 2 条**；label 可用 ROLE 1/ROLE 2；name 为角色中文名；desc 职责说明 **≤25 汉字**。\n" +
+    "- preview_markdown：总长度 **" +
+    String(PREVIEW_MARKDOWN_MIN_LEN) +
     "～" +
+    String(PREVIEW_MARKDOWN_MAX_LEN) +
+    " 字**（中文为主）。**在第一个一级标题 `#` 之前**，必须先写两个二级模块（`##`，# 与字间可有空格）：\n" +
+    "  1) `## 核心词汇`：分 2～3 组主题词，每组 3～4 个英文词，附音标与中文释义（Markdown 列表）。\n" +
+    "  2) `## 角色句型`：每个角色 3～5 条常用句，用反引号包裹英文，可用 `[替换词]` 表示可替换部分。\n" +
+    "  然后按顺序包含三个**一级**标题（必须带 `#`）：`# 开口句`、`# 你的6个任务（概览）`、`# 延长对话小贴士`。\n" +
+    "  - 「# 开口句」：两角色各一句可立刻开口的英文。\n" +
+    "  - 「# 你的6个任务（概览）」：两角色各列 6 条中文任务标题（编号 1-6），顺序能串成自然对话。\n" +
+    "  - 「# 延长对话小贴士」：至少 3 条技巧，每条含中文说明 + **完整自然**的英文例句。\n" +
+    "- cover_url：可公网访问的 **https** 图片 URL（可用 Unsplash 与场景相关图；落库时可能保留种子封面）。\n" +
+    "- difficulty_level：三选一；日常场景建议 intermediate。\n" +
+    "- **room_tasks_by_role（强制）**：键名与 roles[].name **逐字一致**；每角色 **恰好 6** 条任务。\n" +
+    "  - title：中文 **5～10 字**，每条一个小对话目标；任务间有呼应（如问价→推荐→追问→决定→付款→道别）。\n" +
+    "  - hints：每条 **" +
+    String(HINTS_MIN) +
+    " 或 " +
     String(HINTS_MAX) +
-    " 条英文短句**，覆盖不同分支（同意/拒绝/追问/澄清），让用户能自然多轮对话；不要只给一句。\n" +
-    "- 在种子基础上**改写增强**，不要逐字复制种子正文。";
+    " 句**英文口语短句，每句 ≤15 个英文词，覆盖同意/拒绝/追问等分支；可省略 id（服务端会规范化）。\n" +
+    "- 在种子与【管理员指定方向】基础上**改写增强**，勿逐字抄种子。";
 
   var directionBlock = direction
     ? "\n\n【管理员指定方向】你必须将本主题生成结果严格围绕以下方向/关键词展开：\n" + direction

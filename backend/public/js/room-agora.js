@@ -4,6 +4,9 @@
  * - 调试：`room.html?channel=demo-room&uid=10001` 与不同 uid（无需登录）。
  */
 (function () {
+  /** 1v1（paired）单次连麦上限：30 分钟；与场次 end_time 取较早者（客户端用 sessionStorage 固化结束时刻，刷新页面不重置）。 */
+  var PAIR_SESSION_MAX_MS = 30 * 60 * 1000;
+
   var state = {
     client: null,
     joined: false,
@@ -25,6 +28,9 @@
     waitUiWired: false,
     isSandbox: false,
     roomTasksApplied: false,
+    pairHardEndMs: null,
+    pairCountdownInterval: null,
+    pairSessionExpired: false,
   };
 
   var MATCH_TIPS_HTML = [
@@ -52,6 +58,115 @@
     if (state.deferJoinBackupTimer) {
       clearInterval(state.deferJoinBackupTimer);
       state.deferJoinBackupTimer = null;
+    }
+  }
+
+  function storageKeyPairEnd() {
+    return "agoraPairHardEnd_" + (state.timeslotId || "");
+  }
+
+  function clearPairSessionTimers() {
+    if (state.pairCountdownInterval) {
+      clearInterval(state.pairCountdownInterval);
+      state.pairCountdownInterval = null;
+    }
+    state.pairHardEndMs = null;
+    var hint = document.getElementById("roomPairLimitHint");
+    if (hint) {
+      hint.hidden = true;
+      hint.textContent = "";
+      hint.classList.remove("room-pair-limit--warn");
+    }
+  }
+
+  function updatePairLimitHint() {
+    var hint = document.getElementById("roomPairLimitHint");
+    if (!hint || state.pairHardEndMs == null) return;
+    var left = state.pairHardEndMs - Date.now();
+    if (left <= 0) {
+      hint.textContent = "练习时长已到…";
+      hint.hidden = false;
+      return;
+    }
+    var m = Math.floor(left / 60000);
+    var s = Math.floor((left % 60000) / 1000);
+    hint.textContent =
+      "1v1 剩余 " +
+      (m < 10 ? "0" : "") +
+      m +
+      ":" +
+      (s < 10 ? "0" : "") +
+      s +
+      "（最长 30 分钟，或随场次结束提前）";
+    hint.hidden = false;
+    hint.classList.toggle("room-pair-limit--warn", left <= 120000);
+  }
+
+  function schedulePairHardStopAfterPairedJoin() {
+    if (!state.timeslotId || state.pairSessionExpired) return;
+    if (state.pairCountdownInterval) return;
+
+    var now = Date.now();
+    var absoluteCap =
+      state.slotEndMs && !isNaN(state.slotEndMs) && state.slotEndMs > now ? state.slotEndMs : Infinity;
+    var key = storageKeyPairEnd();
+    var hardEnd = null;
+    try {
+      var stored = sessionStorage.getItem(key);
+      if (stored) {
+        var v = parseInt(stored, 10);
+        if (!isNaN(v) && v > now) hardEnd = v;
+      }
+    } catch (_) {}
+    if (hardEnd == null) {
+      hardEnd = Math.min(now + PAIR_SESSION_MAX_MS, absoluteCap);
+    } else {
+      hardEnd = Math.min(hardEnd, absoluteCap);
+    }
+    try {
+      sessionStorage.setItem(key, String(hardEnd));
+    } catch (_) {}
+
+    state.pairHardEndMs = hardEnd;
+    if (hardEnd <= now) {
+      onPairHardStop();
+      return;
+    }
+
+    updatePairLimitHint();
+    state.pairCountdownInterval = setInterval(function () {
+      if (!state.joined || state.pairSessionExpired) {
+        clearPairSessionTimers();
+        return;
+      }
+      updatePairLimitHint();
+      if (Date.now() >= state.pairHardEndMs) {
+        onPairHardStop();
+      }
+    }, 1000);
+  }
+
+  function maybeStartPairSessionTimer(cred) {
+    if (!state.timeslotBookMode || !cred || cred.rtcMode !== "paired") return;
+    if (state.pairSessionExpired) return;
+    schedulePairHardStopAfterPairedJoin();
+  }
+
+  async function onPairHardStop() {
+    if (state.pairSessionExpired) return;
+    if (state.pairCountdownInterval) {
+      clearInterval(state.pairCountdownInterval);
+      state.pairCountdownInterval = null;
+    }
+    state.pairSessionExpired = true;
+    showRoomToast("本次 1v1 练习已达 30 分钟上限（或场次已结束），已自动结束通话。", true);
+    try {
+      await leaveChannel();
+    } catch (e) {
+      console.warn("pair hard stop leave", e);
+    }
+    if (state.timeslotBookMode) {
+      window.location.href = "appointments.html";
     }
   }
 
@@ -382,6 +497,10 @@
     closeMatchTipsSheet();
     hideWaitFlowUi();
     clearDeferJoinTimers();
+    clearPairSessionTimers();
+    try {
+      if (state.timeslotId) sessionStorage.removeItem("agoraPairHardEnd_" + state.timeslotId);
+    } catch (_) {}
     if (state.channelPollTimer) {
       clearInterval(state.channelPollTimer);
       state.channelPollTimer = null;
@@ -416,6 +535,9 @@
           state.lastRtcMode = next.rtcMode || "paired";
           hideWaitFlowUi();
           closeMatchTipsSheet();
+          if (next.rtcMode === "paired") {
+            maybeStartPairSessionTimer(next);
+          }
         }
       } catch (e) {
         console.warn("timeslot channel poll", e);
@@ -482,6 +604,7 @@
       setPartnerLabel("搭档（连接中…）");
       hideWaitFlowUi();
       closeMatchTipsSheet();
+      maybeStartPairSessionTimer(cred);
     }
     startChannelPollTimer(areaToken);
   }
@@ -565,6 +688,7 @@
       if (!joinedNow) return;
       state.lastJoinedChannel = cred.channelName;
       showRoomToast("已进入语伴专属频道", false);
+      maybeStartPairSessionTimer(cred);
       startChannelPollTimer(areaToken);
     } else if (cred.rtcMode === "waiting") {
       if (cred.isSandbox) {

@@ -3,7 +3,7 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
-    <title>管理员后台（简版）</title>
+    <title>管理员后台</title>
     <link rel="stylesheet" href="css/styles.css" />
     <style>
       .admin-shell { max-width: 1100px; margin: 0 auto; padding: 20px; }
@@ -13,9 +13,12 @@
       .admin-row button { padding: 10px 14px; border-radius: 12px; border: 1px solid rgba(26, 92, 255, 0.35); background: rgba(26, 92, 255, 0.10); color: rgba(15, 23, 42, 0.92); cursor: pointer; }
       .admin-row button:hover { background: rgba(26, 92, 255, 0.16); }
       .admin-row button:disabled { opacity: 0.55; cursor: not-allowed; }
-      pre { white-space: pre-wrap; background: rgba(255,255,255,0.92); border: 1px solid rgba(15, 23, 42, 0.10); padding: 12px; border-radius: 14px; color: rgba(15, 23, 42, 0.92); overflow: auto; max-height: 460px; }
+      .admin-btn-danger { border-color: rgba(220, 38, 38, 0.45) !important; background: rgba(220, 38, 38, 0.08) !important; }
+      .admin-btn-danger:hover { background: rgba(220, 38, 38, 0.14) !important; }
+      .admin-btn-ghost { border-color: rgba(15, 23, 42, 0.15) !important; background: rgba(15, 23, 42, 0.04) !important; }
+      pre.admin-pre-out { white-space: pre-wrap; background: rgba(255,255,255,0.92); border: 1px solid rgba(15, 23, 42, 0.10); padding: 12px; border-radius: 14px; color: rgba(15, 23, 42, 0.92); overflow: auto; max-height: 280px; font-size: 12px; }
       .admin-grid { display: grid; grid-template-columns: 1fr; gap: 16px; margin-top: 16px; }
-      .hint { color: rgba(15, 23, 42, 0.62); font-size: 13px; margin-top: 6px; }
+      .hint { color: rgba(15, 23, 42, 0.62); font-size: 13px; margin-top: 6px; line-height: 1.5; }
       table.admin-table { width: 100%; border-collapse: collapse; background: rgba(255,255,255,0.92); border: 1px solid rgba(15, 23, 42, 0.10); border-radius: 14px; overflow: hidden; }
       .admin-table th, .admin-table td { padding: 10px 10px; border-bottom: 1px solid rgba(15, 23, 42, 0.08); font-size: 13px; text-align: left; color: rgba(15, 23, 42, 0.9); vertical-align: top; }
       .admin-table th { font-size: 12px; letter-spacing: 0.06em; text-transform: uppercase; color: rgba(15, 23, 42, 0.62); background: rgba(15, 23, 42, 0.02); }
@@ -34,6 +37,28 @@
       .admin-row textarea#mt_preview { min-height: 200px; }
       .manual-ol { margin: 8px 0 0 18px; padding: 0; color: rgba(15, 23, 42, 0.72); font-size: 13px; line-height: 1.55; }
       .manual-ol li { margin-bottom: 6px; }
+      .admin-tab-nav { display: flex; gap: 6px; flex-wrap: wrap; margin: 18px 0 0; padding: 0; list-style: none; border-bottom: 1px solid rgba(15, 23, 42, 0.1); }
+      .admin-tab-nav button { margin-bottom: -1px; padding: 10px 16px; border-radius: 12px 12px 0 0; border: 1px solid transparent; background: transparent; cursor: pointer; font-size: 14px; color: rgba(15, 23, 42, 0.65); }
+      .admin-tab-nav button:hover { color: rgba(15, 23, 42, 0.9); background: rgba(26, 92, 255, 0.06); }
+      .admin-tab-nav button.is-active { color: rgba(15, 23, 42, 0.95); font-weight: 700; border-color: rgba(15, 23, 42, 0.1); border-bottom-color: rgba(255, 255, 255, 0.96); background: rgba(255, 255, 255, 0.96); }
+      .admin-tab-panel { display: none; margin-top: 0; padding-top: 16px; }
+      .admin-tab-panel.is-active { display: block; }
+      .admin-warn { background: rgba(250, 204, 21, 0.15); border: 1px solid rgba(202, 138, 4, 0.35); border-radius: 14px; padding: 12px 14px; font-size: 13px; color: rgba(15, 23, 42, 0.88); margin-bottom: 14px; }
+      .admin-slot-card { border: 1px solid rgba(15, 23, 42, 0.1); border-radius: 14px; padding: 0 12px 12px; margin-bottom: 12px; background: rgba(255, 255, 255, 0.65); }
+      .admin-slot-card > summary { cursor: pointer; font-weight: 700; padding: 12px 4px; list-style: none; display: flex; align-items: center; justify-content: space-between; gap: 10px; }
+      .admin-slot-card > summary::-webkit-details-marker { display: none; }
+      .admin-slot-card > summary::after { content: "▸"; font-size: 12px; opacity: 0.5; }
+      .admin-slot-card[open] > summary::after { content: "▾"; }
+      .admin-slot-inner { padding-top: 4px; }
+      .admin-json-store { position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px; overflow: hidden; clip: rect(0,0,0,0); border: 0; }
+      .admin-modal-overlay { position: fixed; inset: 0; background: rgba(15, 23, 42, 0.45); z-index: 1000; display: none; align-items: center; justify-content: center; padding: 16px; }
+      .admin-modal-overlay.is-open { display: flex; }
+      .admin-modal { background: #fff; border-radius: 16px; max-width: 900px; width: 100%; max-height: 85vh; display: flex; flex-direction: column; box-shadow: 0 20px 50px rgba(0,0,0,0.2); }
+      .admin-modal-head { display: flex; justify-content: space-between; align-items: center; padding: 12px 16px; border-bottom: 1px solid rgba(15, 23, 42, 0.08); }
+      .admin-modal-head button { padding: 6px 12px; border-radius: 10px; border: 1px solid rgba(15, 23, 42, 0.12); background: #fff; cursor: pointer; }
+      .admin-modal-body { padding: 12px 16px; overflow: auto; margin: 0; font-size: 12px; }
+      .admin-inline-actions { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; margin-top: 8px; }
+      #mt_preview_len { font-size: 12px; color: rgba(15, 23, 42, 0.55); }
     </style>
   </head>
   <body class="page-room">
@@ -43,175 +68,150 @@
         需先用普通页面登录（带 Cookie）。管理员白名单由后端环境变量 <code>ADMIN_EMAILS</code> 控制。
       </div>
 
+      <nav class="admin-tab-nav" role="tablist" aria-label="管理员分区">
+        <button type="button" class="is-active" data-admin-tab="timeslots" id="tabBtnTimeslots">场次管理</button>
+        <button type="button" data-admin-tab="themes" id="tabBtnThemes">主题管理</button>
+        <button type="button" data-admin-tab="bookings" id="tabBtnBookings">预约与配对</button>
+        <button type="button" data-admin-tab="system" id="tabBtnSystem">系统与调试</button>
+      </nav>
+
       <div class="admin-grid">
-        <section class="room-tasks-panel">
-          <div class="room-tasks-head">
-            <h3 class="room-tasks-heading">0) 总览指标</h3>
-          </div>
-          <div class="admin-row">
-            <button id="btnLoadStats">刷新统计</button>
-            <button id="btnLoadCurrentOverview">拉取当前场次总览（上架3主题）</button>
-          </div>
-          <div id="outStats" class="hint">（等待操作）</div>
-          <details style="margin-top:10px">
-            <summary style="cursor:pointer;color:rgba(15,23,42,0.72)">原始 JSON（调试用）</summary>
-            <pre id="outStatsRaw">（等待操作）</pre>
-          </details>
+        <!-- ========== 场次管理 ========== -->
+        <div id="admin-panel-timeslots" class="admin-tab-panel is-active">
+          <section class="room-tasks-panel">
+            <div class="room-tasks-head">
+              <h3 class="room-tasks-heading">总览与统计</h3>
+            </div>
+            <div class="admin-row">
+              <button id="btnLoadStats">刷新统计</button>
+              <button id="btnLoadCurrentOverview">拉取当前场次总览</button>
+              <button type="button" class="admin-btn-ghost" data-json-pre="outStatsRaw">查看 JSON：统计</button>
+              <button type="button" class="admin-btn-ghost" data-json-pre="outCurrentOverviewRaw">查看 JSON：总览</button>
+            </div>
+            <div id="outStats" class="hint">（等待操作）</div>
+            <div id="outCurrentOverview" class="hint" style="margin-top: 10px">（等待操作）</div>
+          </section>
 
-          <div id="outCurrentOverview" class="hint" style="margin-top:10px">（等待操作）</div>
-          <details style="margin-top:10px">
-            <summary style="cursor:pointer;color:rgba(15,23,42,0.72)">原始 JSON（调试用）</summary>
-            <pre id="outCurrentOverviewRaw">（等待操作）</pre>
-          </details>
-        </section>
+          <section class="room-tasks-panel">
+            <div class="room-tasks-head">
+              <h3 class="room-tasks-heading">场次列表</h3>
+            </div>
+            <div class="hint">默认仅拉取「当前范围」内场次；可填 theme_id 限定主题。拉取后可在「预约与配对」页用下拉框选场次。</div>
+            <div class="admin-row">
+              <label>
+                theme_id（可选）
+                <input id="themeId" placeholder="不填则按当前上架主题的场次范围" />
+              </label>
+              <label>
+                仅看当前范围
+                <input id="recentOnly" type="checkbox" checked />
+              </label>
+              <button id="btnLoadSlots">拉取场次</button>
+              <button type="button" class="admin-btn-ghost" data-json-pre="outSlotsRaw">查看 JSON：场次</button>
+            </div>
+            <div id="outSlots" class="hint">（等待操作）</div>
+          </section>
+        </div>
 
-        <section class="room-tasks-panel">
-          <div class="room-tasks-head">
-            <h3 class="room-tasks-heading">1) 查看场次列表</h3>
-          </div>
-          <div class="admin-row">
-            <label>
-              theme_id（可选）
-              <input id="themeId" placeholder="不填默认展示当前上架主题的“当前场次”" />
-            </label>
-            <label>
-              仅看当前范围
-              <input id="recentOnly" type="checkbox" checked />
-            </label>
-            <button id="btnLoadSlots">拉取 timeslots</button>
-          </div>
-          <div id="outSlots" class="hint">（等待操作）</div>
-          <details style="margin-top:10px">
-            <summary style="cursor:pointer;color:rgba(15,23,42,0.72)">原始 JSON（调试用）</summary>
-            <pre id="outSlotsRaw">（等待操作）</pre>
-          </details>
-        </section>
+        <div id="admin-panel-themes" class="admin-tab-panel">
+          <section class="room-tasks-panel">
+            <div class="room-tasks-head">
+              <h3 class="room-tasks-heading">主题与 AI 生成</h3>
+            </div>
+            <div class="hint">
+              请先点<strong>拉取当前活跃主题</strong>（用于预览/写入时解析各槽位主题 id）。再为<strong>槽位 1～3</strong>分别填写方向并<strong>预览生成</strong>，确认后<strong>确认写入</strong>。生成规则为 <code>theme_pack_v5</code>（预习含 <code>## 核心词汇</code>、<code>## 角色句型</code> 等，见手动编辑区说明）。整批刷新会消耗额度，请勿重复点击。
+            </div>
+            <div class="admin-row">
+              <button id="btnLoadActiveThemes">拉取当前活跃主题</button>
+              <button id="btnLoadActiveThemesFull">拉取完整内容</button>
+              <button id="btnLoadGenerations">拉取最近生成记录</button>
+              <button type="button" class="admin-btn-ghost" data-json-pre="outActiveThemesRaw">JSON：活跃摘要</button>
+              <button type="button" class="admin-btn-ghost" data-json-pre="outActiveThemesFullRaw">JSON：完整内容</button>
+              <button type="button" class="admin-btn-ghost" data-json-pre="outGenerationsRaw">JSON：生成记录</button>
+            </div>
+            <div id="outActiveThemes" class="hint" style="margin-top: 10px">（活跃主题未加载）</div>
+            <div id="outActiveThemesFull" class="hint" style="margin-top: 10px">（完整内容未加载）</div>
+            <div class="admin-row" style="margin-top: 10px">
+              <button id="btnLlmRefreshActive">整批 LLM 刷新（至多 3 个上架主题）</button>
+            </div>
+            <pre id="outThemeOps" class="admin-pre-out">（主题操作结果）</pre>
 
-        <section class="room-tasks-panel">
-          <div class="room-tasks-head">
-            <h3 class="room-tasks-heading">1.5) 清理历史场次（删除）</h3>
-          </div>
-          <div class="hint">
-            会删除<strong>已结束</strong>且早于保留天数的场次，并同时删除关联的 bookings / pairs。建议先预览，再确认删除。
-          </div>
-          <div class="admin-row">
-            <label>
-              保留天数 retention_days
-              <input id="retentionDays" placeholder="默认 30（范围 1～365）" />
-            </label>
-            <button id="btnHistoryPreview">预览将删除多少</button>
-            <button id="btnHistoryDelete">确认删除历史场次</button>
-          </div>
-          <pre id="outHistoryCleanup">（等待操作）</pre>
-        </section>
+            <details class="admin-slot-card" open>
+              <summary><span class="js-slot-title" data-slot="0">槽位 1 · （请先拉取活跃主题）</span></summary>
+              <div class="admin-slot-inner">
+                <div class="admin-row">
+                  <label style="min-width: 260px">
+                    生成方向
+                    <input id="dir0" placeholder="例如：深层工作（面试/汇报/会议）" />
+                  </label>
+                  <button id="btnPreview0">预览生成</button>
+                  <button id="btnCommit0" disabled>确认写入</button>
+                  <button type="button" class="admin-btn-ghost js-focus-manual" data-manual-slot="0">载入手动编辑 · 槽位 1</button>
+                </div>
+                <pre id="outThemePreview0" class="admin-pre-out">（尚未预览）</pre>
+              </div>
+            </details>
+            <details class="admin-slot-card">
+              <summary><span class="js-slot-title" data-slot="1">槽位 2 · （请先拉取活跃主题）</span></summary>
+              <div class="admin-slot-inner">
+                <div class="admin-row">
+                  <label style="min-width: 260px">
+                    生成方向
+                    <input id="dir1" placeholder="例如：租房看房（押金/维修/入住）" />
+                  </label>
+                  <button id="btnPreview1">预览生成</button>
+                  <button id="btnCommit1" disabled>确认写入</button>
+                  <button type="button" class="admin-btn-ghost js-focus-manual" data-manual-slot="1">载入手动编辑 · 槽位 2</button>
+                </div>
+                <pre id="outThemePreview1" class="admin-pre-out">（尚未预览）</pre>
+              </div>
+            </details>
+            <details class="admin-slot-card">
+              <summary><span class="js-slot-title" data-slot="2">槽位 3 · （请先拉取活跃主题）</span></summary>
+              <div class="admin-slot-inner">
+                <div class="admin-row">
+                  <label style="min-width: 260px">
+                    生成方向
+                    <input id="dir2" placeholder="例如：客户投诉与协商" />
+                  </label>
+                  <button id="btnPreview2">预览生成</button>
+                  <button id="btnCommit2" disabled>确认写入</button>
+                  <button type="button" class="admin-btn-ghost js-focus-manual" data-manual-slot="2">载入手动编辑 · 槽位 3</button>
+                </div>
+                <pre id="outThemePreview2" class="admin-pre-out">（尚未预览）</pre>
+              </div>
+            </details>
 
-        <section class="room-tasks-panel">
-          <div class="room-tasks-head">
-            <h3 class="room-tasks-heading">2) 查看某场次预约/配对</h3>
-          </div>
-          <div class="admin-row">
-            <label>
-              timeslot_id
-              <input id="timeslotId" placeholder="例如 12" />
-            </label>
-            <button id="btnLoadBookings">拉取 bookings</button>
-            <button id="btnLoadPairs">拉取 pairs</button>
-          </div>
-          <div id="outSlotDetail" class="hint">（等待操作）</div>
-          <details style="margin-top:10px">
-            <summary style="cursor:pointer;color:rgba(15,23,42,0.72)">原始 JSON（调试用）</summary>
-            <pre id="outSlotDetailRaw">（等待操作）</pre>
-          </details>
-        </section>
-
-        <section class="room-tasks-panel">
-          <div class="room-tasks-head">
-            <h3 class="room-tasks-heading">3) 周主题：AI 生成预览 / 写入（管理员）</h3>
-          </div>
-          <div class="hint">
-            先点「拉取当前活跃主题」，再为槽位 1/2/3 输入方向并「预览生成」，确认无误后再「写入槽位」。
-            每次预览会写入生成历史库（可回溯/清理）。生产环境无需开启 <code>ENABLE_DEV_PAIRING</code>。
-          </div>
-          <div class="admin-row">
-            <button id="btnLoadActiveThemes">拉取当前活跃主题</button>
-            <button id="btnLoadActiveThemesFull">拉取当前活跃主题完整内容</button>
-            <button id="btnLoadGenerations">拉取最近生成记录</button>
-          </div>
-
-          <div id="outActiveThemes" class="hint" style="margin-top:10px">（活跃主题未加载）</div>
-          <details style="margin-top:10px">
-            <summary style="cursor:pointer;color:rgba(15,23,42,0.72)">活跃主题原始 JSON</summary>
-            <pre id="outActiveThemesRaw">（活跃主题未加载）</pre>
-          </details>
-
-          <div id="outActiveThemesFull" class="hint" style="margin-top:10px">（活跃主题完整内容未加载）</div>
-          <details style="margin-top:10px">
-            <summary style="cursor:pointer;color:rgba(15,23,42,0.72)">活跃主题完整内容原始 JSON</summary>
-            <pre id="outActiveThemesFullRaw">（活跃主题完整内容未加载）</pre>
-          </details>
-
-          <div class="admin-row" style="margin-top: 10px">
-            <label>
-              槽位 1 方向（theme_slot=0）
-              <input id="dir0" placeholder="例如：深层工作相关（面试/汇报/会议/跨部门沟通）" />
-            </label>
-            <button id="btnPreview0">预览生成槽位1</button>
-            <button id="btnCommit0" disabled>确认写入槽位1</button>
-          </div>
-          <div class="admin-row">
-            <label>
-              槽位 2 方向（theme_slot=1）
-              <input id="dir1" placeholder="例如：租房看房（押金/维修/入住）" />
-            </label>
-            <button id="btnPreview1">预览生成槽位2</button>
-            <button id="btnCommit1" disabled>确认写入槽位2</button>
-          </div>
-          <div class="admin-row">
-            <label>
-              槽位 3 方向（theme_slot=2）
-              <input id="dir2" placeholder="例如：客户投诉与协商（补偿/升级/致歉）" />
-            </label>
-            <button id="btnPreview2">预览生成槽位3</button>
-            <button id="btnCommit2" disabled>确认写入槽位3</button>
-          </div>
-          <div class="admin-row" style="margin-top: 10px">
-            <button id="btnLlmRefreshActive">整批 LLM刷新（当前至多 3 主题）</button>
-          </div>
-          <pre id="outThemeOps">（主题操作结果）</pre>
-          <pre id="outThemePreview0">（槽位1预览未生成）</pre>
-          <pre id="outThemePreview1">（槽位2预览未生成）</pre>
-          <pre id="outThemePreview2">（槽位3预览未生成）</pre>
-
-          <div class="hint" style="margin-top:10px">最近生成记录（留痕 / 复查方向）</div>
-          <div id="outGenerations" class="hint">（生成记录未加载）</div>
-          <details style="margin-top:10px">
-            <summary style="cursor:pointer;color:rgba(15,23,42,0.72)">生成记录原始 JSON</summary>
-            <pre id="outGenerationsRaw">（生成记录未加载）</pre>
-          </details>
-        </section>
+            <details style="margin-top: 14px">
+              <summary style="cursor: pointer; font-weight: 700; color: rgba(15, 23, 42, 0.78)">最近生成记录（表格）</summary>
+              <div id="outGenerations" class="hint" style="margin-top: 8px">（生成记录未加载）</div>
+            </details>
+          </section>
 
         <section class="room-tasks-panel">
-          <div class="room-tasks-head">
-            <h3 class="room-tasks-heading">3.1) 手动编辑周主题（不调用 LLM）</h3>
-          </div>
-          <div class="hint">
-            当 LLM 配额或输出不稳定时，可在此<strong>按表单填写</strong>整包内容并写入数据库。规则与 AI 生成一致（<code>theme_pack_v4</code>）：
-            两角色、每人<strong>恰好 6 条</strong>任务、每条 <strong>3～4 句</strong>英文提示；预习须含三个一级标题。
-          </div>
-          <ol class="manual-ol">
-            <li>选择<strong>周槽位</strong>（0/1/2 对应界面上「槽位 1/2/3」），点<strong>从服务器载入该槽当前主题</strong>把已有内容填进表单（可再改）。</li>
-            <li>两个角色的<strong>中文名</strong>会作为 <code>room_tasks_by_role</code> 的<strong>对象键</strong>，必须与下方「角色一 / 角色二」任务区使用的名字<strong>完全一致</strong>。</li>
-            <li>每条任务的英文提示框：<strong>一行一句</strong>，共 <strong>3～4 行</strong>（对应数组 <code>hints</code>）。</li>
-            <li>先点<strong>仅校验（不写库）</strong>，全部通过后再点<strong>写入数据库</strong>。写入接口与 AI「确认写入」相同，会更新 <code>llm_prompt_version</code>。</li>
-          </ol>
+          <details id="manual-theme-wrap" open style="padding: 4px 0">
+            <summary class="room-tasks-heading" style="cursor: pointer; list-style: none; font-size: 16px; font-weight: 800">
+              手动编辑周主题（不调用 LLM）
+            </summary>
+            <div style="margin-top: 10px">
+              <div class="hint">
+                当 LLM 配额或输出不稳定时，可在此<strong>按表单填写</strong>整包内容并写入数据库。规则与 AI 生成一致（<code>theme_pack_v5</code>）：
+                预习须含 <code>## 核心词汇</code>、<code>## 角色句型</code>（均在 <code># 开口句</code> 之前），再加三个一级标题；总长度 <strong>300～1200</strong> 字；两角色每人 <strong>6 条</strong>任务、每条 <strong>3～4 句</strong>英文提示。
+              </div>
+              <ol class="manual-ol">
+                <li>选择<strong>槽位 1～3</strong>，点<strong>从服务器载入该槽当前主题</strong>把已有内容填进表单（可再改）。</li>
+                <li>两个角色的<strong>中文名</strong>会作为 <code>room_tasks_by_role</code> 的<strong>对象键</strong>，必须与下方「角色一 / 角色二」任务区使用的名字<strong>完全一致</strong>。</li>
+                <li>每条任务的英文提示框：<strong>一行一句</strong>，共 <strong>3～4 行</strong>（对应数组 <code>hints</code>）。</li>
+                <li>先点<strong>仅校验（不写库）</strong>，全部通过后再点<strong>写入数据库</strong>。写入接口与 AI「确认写入」相同，会更新 <code>llm_prompt_version</code>。</li>
+              </ol>
 
-          <div class="admin-row" style="margin-top: 12px">
+              <div class="admin-row" style="margin-top: 12px">
             <label>
-              周槽位 theme_slot
+              目标槽位
               <select id="mt_slot">
-                <option value="0">0（槽位 1）</option>
-                <option value="1">1（槽位 2）</option>
-                <option value="2">2（槽位 3）</option>
+                <option value="0">槽位 1</option>
+                <option value="1">槽位 2</option>
+                <option value="2">槽位 3</option>
               </select>
             </label>
             <label>
@@ -219,7 +219,7 @@
               <input id="mt_theme_id" placeholder="先点载入；或手填上架主题数字 id" inputmode="numeric" style="min-width: 140px" />
             </label>
             <button type="button" id="btnManualLoad">从服务器载入该槽当前主题</button>
-            <button type="button" id="btnManualPreviewTpl">插入预习三标题模板</button>
+            <button type="button" id="btnManualPreviewTpl">插入预习完整模板（v5）</button>
             <button type="button" id="btnManualValidate">仅校验（不写库）</button>
             <button type="button" id="btnManualCommit">写入数据库</button>
           </div>
@@ -305,60 +305,136 @@
           <div id="mt_tasksMount"></div>
 
           <fieldset class="manual-theme-fieldset">
-            <legend>预习 Markdown（须含 # 开口句 / # 你的6个任务（概览） / # 延长对话小贴士）</legend>
-            <div class="hint">总长度约 80～2000 字。可把下方模板中的「角色甲/乙」改成你的两个角色中文名。</div>
-            <textarea id="mt_preview" rows="12" maxlength="2000" placeholder="点击「插入预习三标题模板」开始"></textarea>
+            <legend>预习 Markdown（theme_pack_v5）</legend>
+            <div class="hint">
+              须含 <code>## 核心词汇</code>、<code>## 角色句型</code>（均在 <code># 开口句</code> 前），再含 <code># 开口句</code>、<code># 你的6个任务（概览）</code>、<code># 延长对话小贴士</code>；总长度 <strong>300～1200</strong> 字。可点「插入预习完整模板」后替换「角色甲/乙」为你的角色名并扩写词汇区。
+            </div>
+            <textarea id="mt_preview" rows="18" maxlength="1200" placeholder="点击「插入预习完整模板」开始"></textarea>
+            <div id="mt_preview_len" style="margin-top: 6px">当前字数：0 / 1200</div>
           </fieldset>
 
           <pre id="outManualTheme">（手动主题：校验或写入结果将显示在这里）</pre>
+            </div>
+          </details>
         </section>
+        </div>
 
-        <section class="room-tasks-panel">
-          <div class="room-tasks-head">
-            <h3 class="room-tasks-heading">3.5) 清理 AI 生成记录（删除）</h3>
-          </div>
-          <div class="hint">
-            会删除早于保留天数的 <code>theme_generations</code> 记录（仅生成历史，不影响已写入主题的当前内容）。建议先预览，再确认删除。
-          </div>
-          <div class="admin-row">
-            <label>
-              保留天数 retention_days
-              <input id="genRetentionDays" placeholder="默认 30（范围 1～365）" />
-            </label>
-            <button id="btnGenHistoryPreview">预览将删除多少</button>
-            <button id="btnGenHistoryDelete">确认删除生成记录</button>
-          </div>
-          <pre id="outGenHistoryCleanup">（等待操作）</pre>
-        </section>
+        <div id="admin-panel-bookings" class="admin-tab-panel">
+          <section class="room-tasks-panel">
+            <div class="room-tasks-head">
+              <h3 class="room-tasks-heading">预约与配对查询</h3>
+            </div>
+            <div class="hint">请先在<strong>场次管理</strong>拉取场次列表，再回到此处用下拉选择；或直接输入场次 ID。配对/解除使用下方同一 <code>timeslot_id</code>。</div>
+            <div class="admin-row">
+              <label>
+                场次下拉
+                <select id="bpTimeslotSelect" style="min-width: 320px; padding: 10px 12px; border-radius: 12px; border: 1px solid rgba(15,23,42,0.12); background: #fff">
+                  <option value="">（未加载，请在场次管理拉取）</option>
+                </select>
+              </label>
+              <button type="button" class="admin-btn-ghost" id="btnBpApplySelect">同步到下方 ID</button>
+            </div>
+            <div class="admin-row">
+              <label>
+                timeslot_id
+                <input id="timeslotId" placeholder="例如 12" inputmode="numeric" />
+              </label>
+              <button id="btnLoadBookings">拉取 bookings</button>
+              <button id="btnLoadPairs">拉取 pairs</button>
+              <button type="button" class="admin-btn-ghost" data-json-pre="outSlotDetailRaw">查看 JSON</button>
+            </div>
+            <div id="outSlotDetail" class="hint">（等待操作）</div>
+            <div id="outBookingsTable" style="margin-top: 10px"></div>
+            <div id="outPairsTable" style="margin-top: 10px"></div>
+          </section>
+        </div>
 
-        <section class="room-tasks-panel">
-          <div class="room-tasks-head">
-            <h3 class="room-tasks-heading">4) 手动配对/解除（调试用）</h3>
+        <div id="admin-panel-system" class="admin-tab-panel">
+          <section class="room-tasks-panel">
+            <div class="admin-warn">以下操作可能影响线上数据，请在理解后果后再执行。</div>
+          </section>
+          <section class="room-tasks-panel">
+            <div class="room-tasks-head">
+              <h3 class="room-tasks-heading">清理历史场次</h3>
+            </div>
+            <div class="hint">删除<strong>已结束</strong>且早于保留天数的场次，并级联删除关联 bookings / pairs。须先预览。</div>
+            <div class="admin-row">
+              <label>
+                保留天数
+                <input id="retentionDays" placeholder="默认 30（1～365）" />
+              </label>
+              <button id="btnHistoryPreview">预览将删除数量</button>
+              <button id="btnHistoryDelete" class="admin-btn-danger">确认删除历史场次</button>
+            </div>
+            <pre id="outHistoryCleanup" class="admin-pre-out">（等待操作）</pre>
+          </section>
+          <section class="room-tasks-panel">
+            <div class="room-tasks-head">
+              <h3 class="room-tasks-heading">清理 AI 生成记录</h3>
+            </div>
+            <div class="hint">
+              会删除早于保留天数的 <code>theme_generations</code> 记录（仅生成历史，不影响已写入主题的当前内容）。建议先预览，再确认删除。
+            </div>
+            <div class="admin-row">
+              <label>
+                保留天数
+                <input id="genRetentionDays" placeholder="默认 30（1～365）" />
+              </label>
+              <button id="btnGenHistoryPreview">预览将删除多少</button>
+              <button id="btnGenHistoryDelete" class="admin-btn-danger">确认删除生成记录</button>
+            </div>
+            <pre id="outGenHistoryCleanup" class="admin-pre-out">（等待操作）</pre>
+          </section>
+          <section class="room-tasks-panel">
+            <div class="room-tasks-head">
+              <h3 class="room-tasks-heading">手动配对 / 解除</h3>
+            </div>
+            <div class="hint">使用上方<strong>预约与配对</strong>页填写的 <code>timeslot_id</code>；两名用户须在该场次已有 confirmed 预约。</div>
+            <div class="admin-row">
+              <label>
+                user_a
+                <input id="userA" placeholder="例如 101" />
+              </label>
+              <label>
+                user_b
+                <input id="userB" placeholder="例如 102" />
+              </label>
+              <label>
+                force（可选）
+                <input id="force" placeholder="true / false" />
+              </label>
+              <button id="btnPair">创建配对</button>
+            </div>
+            <div class="admin-row" style="margin-top: 10px">
+              <label>
+                pair_id
+                <input id="pairId" placeholder="例如 5" />
+              </label>
+              <button id="btnUnpair">解除配对</button>
+            </div>
+            <pre id="outOps" class="admin-pre-out">（等待操作）</pre>
+          </section>
+        </div>
+      </div>
+
+      <div class="admin-json-vault" aria-hidden="true">
+        <pre id="outStatsRaw" class="admin-json-store"></pre>
+        <pre id="outCurrentOverviewRaw" class="admin-json-store"></pre>
+        <pre id="outSlotsRaw" class="admin-json-store"></pre>
+        <pre id="outActiveThemesRaw" class="admin-json-store"></pre>
+        <pre id="outActiveThemesFullRaw" class="admin-json-store"></pre>
+        <pre id="outGenerationsRaw" class="admin-json-store"></pre>
+        <pre id="outSlotDetailRaw" class="admin-json-store"></pre>
+      </div>
+
+      <div id="adminJsonModal" class="admin-modal-overlay" role="dialog" aria-modal="true" aria-hidden="true">
+        <div class="admin-modal">
+          <div class="admin-modal-head">
+            <strong id="adminJsonModalTitle">JSON</strong>
+            <button type="button" id="adminJsonModalClose">关闭</button>
           </div>
-          <div class="admin-row">
-            <label>
-              user_a
-              <input id="userA" placeholder="例如 101" />
-            </label>
-            <label>
-              user_b
-              <input id="userB" placeholder="例如 102" />
-            </label>
-            <label>
-              force（可选）
-              <input id="force" placeholder="true 或 false（不填默认为 false）" />
-            </label>
-            <button id="btnPair">创建配对</button>
-          </div>
-          <div class="admin-row" style="margin-top: 10px">
-            <label>
-              pair_id
-              <input id="pairId" placeholder="例如 5" />
-            </label>
-            <button id="btnUnpair">解除配对</button>
-          </div>
-          <pre id="outOps">（等待操作）</pre>
-        </section>
+          <pre id="adminJsonModalBody" class="admin-modal-body"></pre>
+        </div>
       </div>
     </div>
 
@@ -385,6 +461,108 @@
         const el = document.getElementById(id);
         return el ? String(el.value || "").trim() : "";
       }
+
+      window.__adminActiveThemesList = [];
+      window.__adminTimeslotsRows = [];
+
+      function openJsonModal(title, text) {
+        var t = document.getElementById("adminJsonModalTitle");
+        var b = document.getElementById("adminJsonModalBody");
+        var m = document.getElementById("adminJsonModal");
+        if (t) t.textContent = title || "JSON";
+        if (b) b.textContent = text && String(text).trim() ? text : "（尚无数据，请先执行对应拉取）";
+        if (m) {
+          m.classList.add("is-open");
+          m.setAttribute("aria-hidden", "false");
+        }
+      }
+      function closeJsonModal() {
+        var m = document.getElementById("adminJsonModal");
+        if (m) {
+          m.classList.remove("is-open");
+          m.setAttribute("aria-hidden", "true");
+        }
+      }
+
+      function switchAdminTab(name) {
+        document.querySelectorAll(".admin-tab-nav button[data-admin-tab]").forEach(function (btn) {
+          btn.classList.toggle("is-active", btn.getAttribute("data-admin-tab") === name);
+        });
+        document.querySelectorAll(".admin-tab-panel").forEach(function (p) {
+          p.classList.toggle("is-active", p.id === "admin-panel-" + name);
+        });
+      }
+
+      document.querySelectorAll(".admin-tab-nav button[data-admin-tab]").forEach(function (btn) {
+        btn.addEventListener("click", function () {
+          switchAdminTab(btn.getAttribute("data-admin-tab"));
+        });
+      });
+
+      document.addEventListener("click", function (e) {
+        var link = e.target.closest("[data-json-pre]");
+        if (!link) return;
+        e.preventDefault();
+        var id = link.getAttribute("data-json-pre");
+        var pre = id ? document.getElementById(id) : null;
+        openJsonModal("JSON · " + (id || ""), pre ? pre.textContent : "");
+      });
+
+      (function () {
+        var c = document.getElementById("adminJsonModalClose");
+        var m = document.getElementById("adminJsonModal");
+        if (c) c.addEventListener("click", closeJsonModal);
+        if (m)
+          m.addEventListener("click", function (e) {
+            if (e.target === m) closeJsonModal();
+          });
+      })();
+
+      function updateSlotSummaryTitles(themes) {
+        for (var s = 0; s < 3; s++) {
+          var el = document.querySelector('.js-slot-title[data-slot="' + s + '"]');
+          if (!el) continue;
+          var t = Array.isArray(themes) ? themes.find(function (x) { return Number(x.themeSlot) === s; }) : null;
+          el.textContent = "槽位 " + (s + 1) + " · " + (t && t.name ? t.name : "（无或未上架）");
+        }
+      }
+
+      function fillTimeslotSelect(rows) {
+        var sel = document.getElementById("bpTimeslotSelect");
+        if (!sel) return;
+        sel.innerHTML = '<option value="">（选择场次）</option>';
+        (rows || []).forEach(function (r) {
+          var o = document.createElement("option");
+          o.value = String(r.id);
+          o.textContent = "#" + r.id + " · " + (r.themeName || "") + " · " + (r.startTime || "");
+          sel.appendChild(o);
+        });
+      }
+
+      var btnBpApply = document.getElementById("btnBpApplySelect");
+      if (btnBpApply) {
+        btnBpApply.addEventListener("click", function () {
+          var sel = document.getElementById("bpTimeslotSelect");
+          var inp = document.getElementById("timeslotId");
+          if (sel && inp) inp.value = sel.value || "";
+        });
+      }
+
+      document.querySelectorAll(".js-focus-manual").forEach(function (btn) {
+        btn.addEventListener("click", function () {
+          var slot = btn.getAttribute("data-manual-slot");
+          var sel = document.getElementById("mt_slot");
+          if (sel != null && slot != null) sel.value = String(slot);
+          switchAdminTab("themes");
+          var d = document.getElementById("manual-theme-wrap");
+          if (d) {
+            d.open = true;
+            d.scrollIntoView({ behavior: "smooth", block: "start" });
+          }
+          var loadBtn = document.getElementById("btnManualLoad");
+          if (loadBtn) loadBtn.click();
+        });
+      });
 
       var MANUAL_THEME_DIRECTION = "管理员手动编辑";
 
@@ -533,9 +711,24 @@
             hintsEl.value = hs.join("\n");
           }
         }
+        refreshPreviewLen();
       }
 
       mountManualThemeTasks();
+
+      function refreshPreviewLen() {
+        var ta = document.getElementById("mt_preview");
+        var el = document.getElementById("mt_preview_len");
+        if (!ta || !el) return;
+        var n = (ta.value || "").length;
+        el.textContent = "当前字数：" + n + " / 1200（建议 300～1200）";
+        el.style.color = n > 0 && (n < 300 || n > 1200) ? "#b45309" : "rgba(15,23,42,0.55)";
+      }
+      var mtp = document.getElementById("mt_preview");
+      if (mtp) {
+        mtp.addEventListener("input", refreshPreviewLen);
+        refreshPreviewLen();
+      }
 
       document.getElementById("btnManualLoad").addEventListener("click", async function () {
         const out = document.getElementById("outManualTheme");
@@ -564,18 +757,38 @@
 
       document.getElementById("btnManualPreviewTpl").addEventListener("click", function () {
         const tpl =
+          "## 核心词汇\n" +
+          "**购物常用**\n" +
+          "- price /praɪs/ — 价格\n" +
+          "- cash /kæʃ/ — 现金\n" +
+          "- discount /ˈdɪskaʊnt/ — 折扣\n" +
+          "- receipt /rɪˈsiːt/ — 小票\n\n" +
+          "**位置与偏好**\n" +
+          "- aisle /aɪl/ — 货架通道\n" +
+          "- cold /koʊld/ — 冰的\n" +
+          "- size /saɪz/ — 尺码\n\n" +
+          "## 角色句型\n" +
+          "**角色甲**\n" +
+          "- `How much is this [item]?`\n" +
+          "- `Do you have any deals today?`\n" +
+          "- `I'll take [it/them].`\n\n" +
+          "**角色乙**\n" +
+          "- `That's [price].`\n" +
+          "- `We also have [something] on sale.`\n" +
+          "- `Your total is [amount].`\n\n" +
           "# 开口句\n" +
-          "- 角色甲：Hi, I'd like to get this, please.\n" +
-          "- 角色乙：Sure! That's $3.50. Would you like a bag?\n\n" +
+          "- 角色甲：Hi, how much is this bottle of water?\n" +
+          "- 角色乙：That's two dollars. Would you like a bag?\n\n" +
           "# 你的6个任务（概览）\n" +
-          "**角色甲**：1. 打招呼并说明要买什么 2. 询问价格或优惠 3. 追问规格或位置 4. 表达偏好并决定 5. 付款相关 6. 道别\n" +
-          "**角色乙**：1. 问候与报价 2. 主动推荐或说明活动 3. 回答位置或库存 4. 确认购买内容 5. 收款与找零 6. 道别\n\n" +
+          "**角色甲**：1. 打招呼并问价 2. 回应推荐或折扣 3. 追问规格或冷热 4. 表达购买决定 5. 付款与要小票 6. 道别\n" +
+          "**角色乙**：1. 问候并报价 2. 主动推荐或说明活动 3. 回答位置或库存 4. 确认购买清单 5. 收款并找零 6. 道别\n\n" +
           "# 延长对话小贴士\n" +
-          "- 多问一句：What do you recommend?\n" +
-          "- 说明偏好：I prefer something cheaper / cold.\n" +
-          "- 复述确认：So the milk is on aisle 2, right?";
+          "- 想多聊一会可以问推荐：Could you recommend something similar but cheaper?\n" +
+          "- 说明自己的偏好更自然：I prefer cold drinks because it's hot today.\n" +
+          "- 复述对方信息避免听错：So you said the juice is on aisle three, right?";
         const el = document.getElementById("mt_preview");
         if (el) el.value = tpl;
+        refreshPreviewLen();
       });
 
       document.getElementById("btnManualValidate").addEventListener("click", async function () {
@@ -719,6 +932,10 @@
             { h: "bookings", v: (r) => r.bookings },
             { h: "pairs", v: (r) => r.pairs },
           ], rows);
+          if (slots.length) {
+            window.__adminTimeslotsRows = slots;
+            fillTimeslotSelect(slots);
+          }
           if (outRaw) outRaw.textContent = JSON.stringify(json, null, 2);
         } catch (e) {
           out.textContent = "失败：" + (e.message || e);
@@ -742,6 +959,8 @@
             { h: "llm_ver", v: (r) => r.llmPromptVersion || "" },
             { h: "scene_preview", v: (r) => r.scenePreview || "" },
           ], entries);
+          window.__adminActiveThemesList = entries;
+          updateSlotSummaryTitles(entries);
           if (outRaw) outRaw.textContent = JSON.stringify(json, null, 2);
         } catch (e) {
           out.textContent = "失败：" + (e.message || e);
@@ -765,6 +984,8 @@
             { h: "tasks_shape", v: (r) => (r.roomTasks && typeof r.roomTasks === "object" && !Array.isArray(r.roomTasks)) ? ("v" + (r.roomTasks.version || "?") + " byRole") : (Array.isArray(r.roomTasks) ? ("array(" + r.roomTasks.length + ")") : "null") },
             { h: "llm_ver", v: (r) => r.llmPromptVersion || "" },
           ], entries);
+          window.__adminActiveThemesList = entries;
+          updateSlotSummaryTitles(entries);
           if (outRaw) outRaw.textContent = JSON.stringify(json, null, 2);
         } catch (e) {
           out.textContent = "失败：" + (e.message || e);
@@ -811,9 +1032,12 @@
       });
 
       function parseActiveThemesJson() {
+        if (window.__adminActiveThemesList && window.__adminActiveThemesList.length) {
+          return window.__adminActiveThemesList;
+        }
         const out = document.getElementById("outActiveThemesRaw");
         try {
-          const obj = JSON.parse(out.textContent || out.innerText || "");
+          const obj = JSON.parse((out && out.textContent) || "");
           return obj && obj.data && Array.isArray(obj.data.themes) ? obj.data.themes : [];
         } catch {
           return [];
@@ -926,6 +1150,8 @@
             { h: "confirmed", v: (r) => r.bookingConfirmedCount },
             { h: "pairs", v: (r) => r.pairCount },
           ], rows);
+          window.__adminTimeslotsRows = rows;
+          fillTimeslotSelect(rows);
           if (outRaw) outRaw.textContent = JSON.stringify(json, null, 2);
         } catch (e) {
           out.textContent = "失败：" + (e.message || e);
@@ -992,24 +1218,52 @@
       document.getElementById("btnLoadBookings").addEventListener("click", async function () {
         const tid = val("timeslotId");
         const out = document.getElementById("outSlotDetail");
+        const outRaw = document.getElementById("outSlotDetailRaw");
+        const tb = document.getElementById("outBookingsTable");
         out.textContent = "加载中…";
+        if (tb) tb.innerHTML = "";
         try {
           const json = await api("/api/admin/timeslots/" + encodeURIComponent(tid) + "/bookings");
-          out.textContent = JSON.stringify(json, null, 2);
+          if (outRaw) outRaw.textContent = JSON.stringify(json, null, 2);
+          const list = json && json.data && Array.isArray(json.data.bookings) ? json.data.bookings : [];
+          out.textContent = "已加载 bookings：" + list.length + " 条（原始 JSON 可点「查看 JSON」）";
+          renderTable(tb, [
+            { h: "booking_id", v: (r) => r.bookingId },
+            { h: "user_id", v: (r) => r.userId },
+            { h: "nickname", v: (r) => r.nickname },
+            { h: "status", v: (r) => r.status },
+            { h: "created", v: (r) => r.createdAt },
+          ], list);
         } catch (e) {
           out.textContent = "失败：" + (e.message || e);
+          if (outRaw) outRaw.textContent = "";
         }
       });
 
       document.getElementById("btnLoadPairs").addEventListener("click", async function () {
         const tid = val("timeslotId");
         const out = document.getElementById("outSlotDetail");
+        const outRaw = document.getElementById("outSlotDetailRaw");
+        const tb = document.getElementById("outPairsTable");
         out.textContent = "加载中…";
+        if (tb) tb.innerHTML = "";
         try {
           const json = await api("/api/admin/timeslots/" + encodeURIComponent(tid) + "/pairs");
-          out.textContent = JSON.stringify(json, null, 2);
+          if (outRaw) outRaw.textContent = JSON.stringify(json, null, 2);
+          const list = json && json.data && Array.isArray(json.data.pairs) ? json.data.pairs : [];
+          out.textContent = "已加载 pairs：" + list.length + " 条（原始 JSON 可点「查看 JSON」）";
+          renderTable(tb, [
+            { h: "pair_id", v: (r) => r.id },
+            { h: "user_a", v: (r) => (r.userA && r.userA.id) || "" },
+            { h: "user_b", v: (r) => (r.userB && r.userB.id) || "" },
+            { h: "nick_a", v: (r) => (r.userA && r.userA.nickname) || "" },
+            { h: "nick_b", v: (r) => (r.userB && r.userB.nickname) || "" },
+            { h: "channel", v: (r) => r.channelName || "" },
+            { h: "status", v: (r) => r.status },
+          ], list);
         } catch (e) {
           out.textContent = "失败：" + (e.message || e);
+          if (outRaw) outRaw.textContent = "";
         }
       });
 
